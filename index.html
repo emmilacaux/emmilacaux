@@ -129,18 +129,18 @@ img,svg{ max-width:100%; display:block; }
 .page-simple .contact-link, .link{
   filter: blur(.6px) contrast(200%);
 }
-/* Phone screens (higher device pixel ratio) render this filter much
-   more aggressively than desktop — the same blur(.6px) contrast(200%)
-   that's a subtle grain on desktop turns into thick blobs on a phone,
-   in every mobile browser, not just one engine. Cut way down (not off
-   — the texture should still read) on narrow/phone viewports. */
+/* `blur()` on text is what breaks on phone screens (higher device pixel
+   ratio) — every magnitude tried, from .1px to .6px, rendered as thick
+   blobs. `contrast()` alone doesn't blur/resample neighboring pixels,
+   so it can't produce that artifact — texture comes from contrast only
+   on narrow/phone viewports, no blur at all. */
 @media (max-width:760px){
   .photo-caption, .fragment, .label-inline, .counter, .meta,
   .nextprev a, .site-footer, .project-head .title, .index-item,
   .index-head, .page-simple h1:not(.brand-name), .page-simple p,
   .page-simple .field-label, .page-simple .field-value,
   .page-simple .contact-link, .link{
-    filter: blur(.1px) contrast(200%);
+    filter: contrast(130%);
   }
 }
 /* Safari specifically still blobs even at that lighter mobile dose (not
@@ -241,7 +241,7 @@ header.site .brand{
   filter: blur(.375px) contrast(145%);
 }
 @media (max-width:760px){
-  header.site .brand{ filter: blur(.1px) contrast(200%); }
+  header.site .brand{ filter: contrast(130%); }
 }
 .is-safari header.site .brand{ filter: none; }
 /* On any page but home, the name is also the way back — hovering it
