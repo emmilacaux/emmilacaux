@@ -116,12 +116,15 @@ img,svg{ max-width:100%; display:block; }
 .page-simple .contact-link, .link{
   filter: blur(.6px) contrast(200%);
 }
-/* iOS Safari renders text-blur filters much more aggressively than
-   desktop Chrome on retina screens (a known WebKit quirk) — the same
-   blur(.6px) contrast(200%) that reads as a subtle grain on desktop
-   turns into thick black blobs on an iPhone. Cut it down hard on
-   narrow/touch viewports instead of removing it outright. */
-@media (max-width:760px){
+/* iOS's forced WebKit engine (Safari, and every other browser on iOS —
+   Chrome/Firefox on iOS are WebKit underneath too, by Apple's rules)
+   renders text-blur filters much more aggressively than desktop/Android
+   Chrome on retina screens — the same blur(.6px) contrast(200%) that
+   reads as a subtle grain everywhere else turns into thick black blobs
+   on an iPhone. `-webkit-touch-callout` is only recognized on iOS
+   WebKit, so @supports on it targets exactly that engine — Android and
+   desktop keep the full effect untouched. */
+@supports (-webkit-touch-callout:none){
   .photo-caption, .fragment, .label-inline, .counter, .meta,
   .nextprev a, .site-footer, .project-head .title, .index-item,
   .index-head, .page-simple h1:not(.brand-name), .page-simple p,
@@ -211,7 +214,7 @@ header.site .brand{
      stays the cleanest thing on the page — bumped up a touch. */
   filter: blur(.375px) contrast(145%);
 }
-@media (max-width:760px){
+@supports (-webkit-touch-callout:none){
   header.site .brand{ filter: blur(.15px) contrast(115%); }
 }
 /* On any page but home, the name is also the way back — hovering it
