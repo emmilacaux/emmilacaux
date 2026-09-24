@@ -811,9 +811,12 @@ function rasterizeOne(el){
   if (!width) return;
 
   const cs = getComputedStyle(el);
+  // Picked on a real phone from 8 side-by-side options (mobile-blur-test.html) —
+  // not the desktop blur(.6px)/contrast(200%) values scaled down, an
+  // independently chosen radius/contrast pair that actually reads right here.
   const isBrand = el.matches('header.site .brand');
-  const blurPx = isBrand ? 0.375 : 0.6;
-  const contrastPct = isBrand ? 145 : 200;
+  const blurPx = 1;
+  const contrastPct = isBrand ? 130 : 150;
 
   const fontSize = parseFloat(cs.fontSize) || 14;
   let lineHeight = parseFloat(cs.lineHeight);
