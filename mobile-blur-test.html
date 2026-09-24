@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mobile Blur Test</title>
+<style>
+@font-face{
+  font-family:'Generic G20-FR Classic';
+  src: url('fonts/Generic-G20-FR-Classic-DEMO.otf') format('opentype');
+  font-display: swap;
+}
+body{
+  background:#fff; color:#111;
+  font-family:'Generic G20-FR Classic', sans-serif;
+  margin:0; padding: 24px 20px 80px;
+}
+h1{ font-size:.85rem; font-weight:400; margin:0 0 8px; }
+.intro{ font-size:.72rem; color:#5E5A57; line-height:1.6; margin:0 0 28px; }
+.row{ padding: 18px 0; border-top:1px solid #D7D2CE; }
+.row:last-child{ border-bottom:1px solid #D7D2CE; }
+.tag{ font-size:.68rem; color:#8B1114; margin-bottom:8px; }
+.sample{ font-size:14px; line-height:1.85; max-width: 32ch; }
+</style>
+</head>
+<body>
+
+<h1>Blur manual (canvas) — variantes para probar en el celular</h1>
+<p class="intro">Cada muestra usa el mismo pipeline real del sitio (fillText + blur manual en alpha + contraste en alpha), a tamaño real 14px. Decime el número que se sienta más parecido al efecto de escritorio.</p>
+
+<div class="row"><div class="tag">V1 — radius 1, contrast 150%</div><div class="sample" id="v1">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V2 — radius 1, contrast 200% (actual en el sitio)</div><div class="sample" id="v2">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V3 — radius 2, contrast 150%</div><div class="sample" id="v3">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V4 — radius 2, contrast 200%</div><div class="sample" id="v4">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V5 — radius 3, contrast 130%</div><div class="sample" id="v5">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V6 — radius 1.5, contrast 175%</div><div class="sample" id="v6">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V7 — radius 2, contrast 110%</div><div class="sample" id="v7">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">V8 — radius 3, contrast 100% (blur puro, sin contraste)</div><div class="sample" id="v8">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">Control — sin efecto</div><div class="sample">Blurry memories from the best of this summer.</div></div>
+
+<script>
+function boxBlurAlpha(imageData, radius){
+  const r = Math.max(1, Math.round(radius));
+  const { data, width, height } = imageData;
+  const tmp = new Float32Array(width * height);
+  for (let y = 0; y < height; y++){
+    for (let x = 0; x < width; x++){
+      let sum = 0, count = 0;
+      for (let dx = -r; dx <= r; dx++){
+        const nx = x + dx;
+        if (nx >= 0 && nx < width){ sum += data[(y * width + nx) * 4 + 3]; count++; }
+      }
+      tmp[y * width + x] = sum / count;
+    }
+  }
+  for (let x = 0; x < width; x++){
+    for (let y = 0; y < height; y++){
+      let sum = 0, count = 0;
+      for (let dy = -r; dy <= r; dy++){
+        const ny = y + dy;
+        if (ny >= 0 && ny < height){ sum += tmp[ny * width + x]; count++; }
+      }
+      data[(y * width + x) * 4 + 3] = Math.round(sum / count);
+    }
+  }
+}
+function contrastAlpha(imageData, contrastPct){
+  const factor = contrastPct / 100;
+  const { data } = imageData;
+  for (let i = 3; i < data.length; i += 4){
+    const a = (data[i] / 255 - 0.5) * factor + 0.5;
+    data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
+  }
+}
+function wrapCanvasText(ctx, text, maxWidth){
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  words.forEach(word=>{
+    const test = line ? line + ' ' + word : word;
+    if (line && ctx.measureText(test).width > maxWidth) { lines.push(line); line = word; }
+    else { line = test; }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+function rasterize(el, radius, contrastPct){
+  const text = el.textContent.trim();
+  const width = Math.ceil(el.getBoundingClientRect().width);
+  const cs = getComputedStyle(el);
+  const fontSize = parseFloat(cs.fontSize) || 14;
+  const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.3;
+  const font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const lines = wrapCanvasText(measure, text, width);
+  const height = Math.ceil(lines.length * lineHeight);
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(width * dpr);
+  canvas.height = Math.ceil(height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.font = font;
+  ctx.fillStyle = cs.color;
+  ctx.textBaseline = 'top';
+  lines.forEach((line, i)=> ctx.fillText(line, 0, i * lineHeight));
+  const imgData = ctx.getImageData(0,0,canvas.width, canvas.height);
+  boxBlurAlpha(imgData, radius * dpr);
+  contrastAlpha(imgData, contrastPct);
+  ctx.putImageData(imgData, 0, 0);
+  el.style.height = height + 'px';
+  el.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
+  el.style.backgroundSize = `${width}px ${height}px`;
+  el.style.backgroundRepeat = 'no-repeat';
+  el.style.color = 'transparent';
+}
+document.fonts.ready.then(()=>{
+  rasterize(document.getElementById('v1'), 1, 150);
+  rasterize(document.getElementById('v2'), 1, 200);
+  rasterize(document.getElementById('v3'), 2, 150);
+  rasterize(document.getElementById('v4'), 2, 200);
+  rasterize(document.getElementById('v5'), 3, 130);
+  rasterize(document.getElementById('v6'), 1.5, 175);
+  rasterize(document.getElementById('v7'), 2, 110);
+  rasterize(document.getElementById('v8'), 3, 100);
+});
+</script>
+</body>
+</html>
