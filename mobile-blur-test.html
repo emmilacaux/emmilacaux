@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mobile Blur Test</title>
+<style>
+@font-face{
+  font-family:'Generic G20-FR Classic';
+  src: url('fonts/Generic-G20-FR-Classic-DEMO.otf') format('opentype');
+  font-display: swap;
+}
+body{
+  background:#fff; color:#111;
+  font-family:'Generic G20-FR Classic', sans-serif;
+  margin:0; padding: 24px 20px 80px;
+}
+h1{ font-size:.85rem; font-weight:400; margin:0 0 8px; }
+.intro{ font-size:.72rem; color:#5E5A57; line-height:1.6; margin:0 0 28px; }
+.row{ padding: 18px 0; border-top:1px solid #D7D2CE; }
+.row:last-child{ border-bottom:1px solid #D7D2CE; }
+.tag{ font-size:.68rem; color:#8B1114; margin-bottom:8px; }
+.sample{ font-size:14px; line-height:1.85; max-width: 32ch; }
+</style>
+</head>
+<body>
+
+<h1>Filtro CSS en vivo — mismo mecanismo que el sitio, distintas intensidades</h1>
+<p class="intro">Todas usan `filter: blur() contrast()` directo en CSS, sin canvas ni trucos — exactamente como corre el sitio ahora. Tamaño real 14px. Decime el número que se ve mejor.</p>
+
+<div class="row"><div class="tag">L1 — blur(.15px) contrast(125%) — bien por debajo</div><div class="sample" style="filter:blur(.15px) contrast(125%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">L2 — blur(.3px) contrast(150%) — por debajo</div><div class="sample" style="filter:blur(.3px) contrast(150%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">L3 — blur(.45px) contrast(175%) — un poco por debajo</div><div class="sample" style="filter:blur(.45px) contrast(175%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">L4 — blur(.6px) contrast(200%) — igual que el sitio ahora</div><div class="sample" style="filter:blur(.6px) contrast(200%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">L5 — blur(.75px) contrast(225%) — un poco por encima</div><div class="sample" style="filter:blur(.75px) contrast(225%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">L6 — blur(.9px) contrast(250%) — por encima</div><div class="sample" style="filter:blur(.9px) contrast(250%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">L7 — blur(1.2px) contrast(280%) — bien por encima</div><div class="sample" style="filter:blur(1.2px) contrast(280%)">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">Control — sin efecto</div><div class="sample">Blurry memories from the best of this summer.</div></div>
+
+</body>
+</html>
