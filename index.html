@@ -129,17 +129,27 @@ img,svg{ max-width:100%; display:block; }
 .page-simple .contact-link, .link{
   filter: blur(.6px) contrast(200%);
 }
-/* Safari specifically (not "anything WebKit-based" — Chrome recognizes
-   -webkit- prefixed properties too, so the old @supports(-webkit-
-   touch-callout:none) trick wrongly caught Android Chrome as well)
-   renders text-blur filters far more aggressively than every other
-   browser — the same blur(.6px) contrast(200%) that reads as a subtle
-   grain elsewhere turns into thick black blobs in Safari, and even a
-   much lighter dose (blur(.15px) contrast(115%)) still did. Real
-   browser detection instead of a CSS feature-sniffing trick: a small
-   inline script below tags <html> with .is-safari from the user agent,
-   and only that gets the texture switched off. Everyone else — Chrome,
-   Firefox, Edge, Android, desktop — keeps the full effect. */
+/* Phone screens (higher device pixel ratio) render this filter much
+   more aggressively than desktop — the same blur(.6px) contrast(200%)
+   that's a subtle grain on desktop turns into thick blobs on a phone,
+   in every mobile browser, not just one engine. Cut way down (not off
+   — the texture should still read) on narrow/phone viewports. */
+@media (max-width:760px){
+  .photo-caption, .fragment, .label-inline, .counter, .meta,
+  .nextprev a, .site-footer, .project-head .title, .index-item,
+  .index-head, .page-simple h1:not(.brand-name), .page-simple p,
+  .page-simple .field-label, .page-simple .field-value,
+  .page-simple .contact-link, .link{
+    filter: blur(.15px) contrast(115%);
+  }
+}
+/* Safari specifically still blobs even at that lighter mobile dose (not
+   "anything WebKit-based" — Chrome recognizes -webkit- prefixed
+   properties too, so the old @supports(-webkit-touch-callout:none)
+   trick wrongly caught Android Chrome as well). A small inline script
+   below tags <html> with .is-safari from the real user agent, and only
+   Safari gets the texture switched off entirely; every other mobile
+   browser keeps the lighter dose above, not nothing. */
 .is-safari .photo-caption, .is-safari .fragment, .is-safari .label-inline,
 .is-safari .counter, .is-safari .meta, .is-safari .nextprev a,
 .is-safari .site-footer, .is-safari .project-head .title,
@@ -229,6 +239,9 @@ header.site .brand{
   /* lighter dose of the digitized texture than body text, so the name
      stays the cleanest thing on the page — bumped up a touch. */
   filter: blur(.375px) contrast(145%);
+}
+@media (max-width:760px){
+  header.site .brand{ filter: blur(.15px) contrast(115%); }
 }
 .is-safari header.site .brand{ filter: none; }
 /* On any page but home, the name is also the way back — hovering it
