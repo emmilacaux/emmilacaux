@@ -744,6 +744,49 @@ function clearRasterizedText(){
   });
 }
 
+/* Manual blur+contrast on the alpha channel — not ctx.filter. Canvas 2D's
+   `filter` property is silently unsupported (a no-op, no error) on some
+   real Safari builds, which is why text rasterized with it came out
+   perfectly crisp instead of textured. getImageData/putImageData pixel
+   math has no such gap — it's core Canvas2D, supported everywhere. Blur
+   softens alpha (our ink is a flat fill color; only the anti-aliased
+   edge *coverage* varies), contrast then pushes that edge harder, which
+   is what reads as "bolder/digitized" the same way the CSS filter did. */
+function boxBlurAlpha(imageData, radius){
+  const r = Math.max(1, Math.round(radius));
+  const { data, width, height } = imageData;
+  const tmp = new Float32Array(width * height);
+  for (let y = 0; y < height; y++){
+    for (let x = 0; x < width; x++){
+      let sum = 0, count = 0;
+      for (let dx = -r; dx <= r; dx++){
+        const nx = x + dx;
+        if (nx >= 0 && nx < width){ sum += data[(y * width + nx) * 4 + 3]; count++; }
+      }
+      tmp[y * width + x] = sum / count;
+    }
+  }
+  for (let x = 0; x < width; x++){
+    for (let y = 0; y < height; y++){
+      let sum = 0, count = 0;
+      for (let dy = -r; dy <= r; dy++){
+        const ny = y + dy;
+        if (ny >= 0 && ny < height){ sum += tmp[ny * width + x]; count++; }
+      }
+      data[(y * width + x) * 4 + 3] = Math.round(sum / count);
+    }
+  }
+}
+
+function contrastAlpha(imageData, contrastPct){
+  const factor = contrastPct / 100;
+  const { data } = imageData;
+  for (let i = 3; i < data.length; i += 4){
+    const a = (data[i] / 255 - 0.5) * factor + 0.5;
+    data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
+  }
+}
+
 function wrapCanvasText(ctx, text, maxWidth){
   const words = text.split(/\s+/).filter(Boolean);
   const lines = [];
@@ -793,8 +836,6 @@ function rasterizeOne(el){
   ctx.font = font;
   ctx.fillStyle = cs.color;
   ctx.textBaseline = 'top';
-  ctx.filter = `blur(${blurPx}px) contrast(${contrastPct}%)`;
-
   lines.forEach((line, i)=>{
     const lineWidth = ctx.measureText(line).width;
     let x = 0;
@@ -802,6 +843,11 @@ function rasterizeOne(el){
     else if (textAlign === 'right') x = width - lineWidth;
     ctx.fillText(line, x, i * lineHeight);
   });
+
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  boxBlurAlpha(imgData, blurPx * dpr);
+  contrastAlpha(imgData, contrastPct);
+  ctx.putImageData(imgData, 0, 0);
 
   // A wrapped `display:inline` box (e.g. a project title <a> that spans two
   // lines) paints its background per line-fragment, not as one continuous
