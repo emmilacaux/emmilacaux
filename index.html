@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Emmi Lacaux</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%238B1114'/%3E%3C/svg%3E">
+<style>
+
+/* ==================================================================
+   EMMI LACAUX — DIGITAL ARCHIVE (v2)
+
+   FONTS
+   -----
+   Name  : "New Berolina MT"        (Monotype, calligraphic script
+           by Martin Wilke, 1965) — provided font file, loaded from
+           /fonts/NewBerolinaMT.ttf.
+   Body  : "Generic G20-FR Classic" (demo cut, uploaded by the
+           artist) — provided font file, loaded from
+           /fonts/Generic-G20-FR-Classic-DEMO.otf.
+
+   Both are loaded via @font-face pointing at the real files in
+   /fonts/ (no base64 inlining needed now that this runs as a real
+   project instead of a single-file artifact). The fallback keyword
+   ('serif' / 'sans-serif') only applies if a browser can't load the
+   font file at all.
+
+   Note: the G20-FR Classic file is a DEMO cut. It carries full
+   upper/lowercase + digits, so body text renders correctly, but a
+   demo build can be missing extended punctuation/ligatures or be
+   licensed for preview only — swap in the full retail file the
+   same way (replace /fonts/Generic-G20-FR-Classic-DEMO.otf) once
+   available.
+
+   Verify at runtime in devtools:
+     document.fonts.check("16px 'New Berolina MT'")
+     document.fonts.check("16px 'Generic G20-FR Classic'")
+   (both log to console on load — see bottom of <script>)
+   ================================================================== */
+
+@font-face{
+  font-family:'New Berolina MT';
+  src: url('fonts/NewBerolinaMT.ttf') format('truetype');
+  font-display: swap;
+  font-weight: 400;
+}
+/* FRUTIGER — commented out until licensed files are supplied.
+   Once available, uncomment and replace the src with base64 data
+   URIs (same method as New Berolina MT above), then update
+   --font-body below to 'Frutiger' and the browser will pick it
+   up automatically. Two weights: 55 Roman (400) for running text,
+   65 Bold (700) only where already used (project titles, strong
+   emphasis) — do not make everything bold.
+
+@font-face{
+  font-family:'Frutiger';
+  src: url('data:font/woff2;base64,REPLACE_WITH_FRUTIGER_55_ROMAN') format('woff2');
+  font-display: swap;
+  font-weight: 400;
+}
+@font-face{
+  font-family:'Frutiger';
+  src: url('data:font/woff2;base64,REPLACE_WITH_FRUTIGER_65_BOLD') format('woff2');
+  font-display: swap;
+  font-weight: 700;
+}
+*/
+
+@font-face{
+  font-family:'Generic G20-FR Classic';
+  src: url('fonts/Generic-G20-FR-Classic-DEMO.otf') format('opentype');
+  font-display: swap;
+  font-weight: 400;
+}
+
+:root{
+  --bg:#FFFFFF;
+  --ink:#111111;
+  --muted:#5E5A57;
+  --line:#D7D2CE;
+  --red:#8B1114;
+
+  --font-name:'New Berolina MT', serif;
+  --font-body:'Generic G20-FR Classic', sans-serif;
+
+  --gutter: clamp(18px, 4vw, 52px);
+  box-sizing:border-box;
+  padding-top: env(safe-area-inset-top,0px);
+  padding-bottom: env(safe-area-inset-bottom,0px);
+}
+html{ scroll-padding-top: env(safe-area-inset-top,0px); }
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:14px;
+  -webkit-font-smoothing:auto;
+  text-rendering:auto;
+  min-height:100%;
+}
+img,svg{ max-width:100%; display:block; }
+
+/* ---------------- digitized/degraded text texture (variant B2) ----------------
+   blur+contrast, tuned so it reads at the site's real 14px body size.
+   Scoped to body-text elements only — never applied to body/.photo/img,
+   since filter on an ancestor would blur photographs too. 'Emmi Lacaux'
+   (.brand / h1.brand-name, New Berolina MT) gets its own, lighter dose
+   defined next to each of those rules, so it still reads as the one
+   clean, legible appearance of the name. */
+.photo-caption, .fragment, .label-inline, .counter, .meta,
+.nextprev a, .site-footer, .project-head .title, .index-item,
+.index-head, .page-simple h1:not(.brand-name), .page-simple p,
+.page-simple .field-label, .page-simple .field-value,
+.page-simple .contact-link, .link{
+  filter: blur(.6px) contrast(200%);
+}
+/* iOS Safari renders text-blur filters much more aggressively than
+   desktop Chrome on retina screens (a known WebKit quirk) — the same
+   blur(.6px) contrast(200%) that reads as a subtle grain on desktop
+   turns into thick black blobs on an iPhone. Cut it down hard on
+   narrow/touch viewports instead of removing it outright. */
+@media (max-width:760px){
+  .photo-caption, .fragment, .label-inline, .counter, .meta,
+  .nextprev a, .site-footer, .project-head .title, .index-item,
+  .index-head, .page-simple h1:not(.brand-name), .page-simple p,
+  .page-simple .field-label, .page-simple .field-value,
+  .page-simple .contact-link, .link{
+    filter: blur(.15px) contrast(115%);
+  }
+}
+a{ color:inherit; text-decoration:none; }
+::selection{ background:transparent; color:var(--red); text-decoration:underline; text-decoration-color:var(--red); text-decoration-thickness:1px; transition:none !important; }
+
+/* ---------------- cursor — the site's own — dash, twice, crossed ----------------
+   Not a drawn shape: this is the literal "—" glyph from Generic G20-FR
+   Classic, rendered at 20px (a touch above the 14px body size so it
+   reads clearly as a cursor), weight 400, blur/contrast scaled from the
+   same .6px/14px body ratio, in --red, then rotated ±45° and composited
+   into one 28×28 PNG (assets/cursor-x.png). Same texture as the letters,
+   not an approximation. Same everywhere, including links — the hover
+   underline signals interactivity, not the cursor. */
+html, body, a{
+  cursor: url("assets/cursor-x.png") 14 14, auto;
+}
+
+/* ---------------- scrollbar — the same — dash, rotated vertical ----------------
+   assets/scrollbar-dash.png is that same rendered, blurred dash glyph
+   (in --muted instead of --red) rotated 90° and stretched the length of
+   the thumb, so the scrollbar reads as the same typographic mark. */
+html{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--bg); }
+::-webkit-scrollbar{ width:6px; height:6px; }
+::-webkit-scrollbar-button{ display:none; width:0; height:0; }
+::-webkit-scrollbar-track{ background:var(--bg); }
+::-webkit-scrollbar-track-piece{ background:var(--bg); }
+::-webkit-scrollbar-thumb{
+  background-color:var(--muted);
+  /* the blur on assets/scrollbar-dash.png sits at its two tips — stamped
+     once at the top and once at the bottom of the thumb (flat --muted
+     fills the rest) so the soft edge reads at any thumb length, instead
+     of getting stretched thin across a tall thumb. */
+  background-image:url("assets/scrollbar-dash.png"), url("assets/scrollbar-dash.png");
+  background-repeat:no-repeat, no-repeat;
+  background-position: top center, bottom center;
+  background-size: 100% 18px, 100% 18px;
+  border-radius:0; min-height:80px;
+}
+::-webkit-scrollbar-thumb:hover{ background-color:var(--ink); }
+::-webkit-scrollbar-corner{ background:var(--bg); }
+
+/* ---------------- one link language, used everywhere ---------------- */
+/* No persistent "active" look — only :hover turns text red + underlined.
+   Direct text-decoration, no border-bottom/padding hit-area tricks. */
+.link,
+.link.active{
+  color:var(--ink);
+  text-decoration:none;
+  text-underline-offset:3px;
+  text-decoration-thickness:1px;
+  transition:none !important;
+  animation:none !important;
+}
+.link:hover,
+.link.active:hover{
+  color:var(--red);
+  text-decoration:underline;
+  text-decoration-color:var(--red);
+}
+
+/* ---------------- header / nav ---------------- */
+header.site{
+  position:fixed; top:0; left:0; right:0; z-index:40;
+  background:transparent;
+  display:flex; justify-content:space-between; align-items:flex-start;
+  padding: 22px var(--gutter) 16px;
+  padding-top: calc(env(safe-area-inset-top,0px) + 22px);
+}
+header.site .brand{
+  font-family:var(--font-name);
+  font-style:italic;
+  color:var(--red);
+  font-size: 1.05rem;
+  letter-spacing:.01em;
+  line-height:1;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  -webkit-text-stroke:0;
+  text-shadow:none;
+  /* lighter dose of the digitized texture than body text, so the name
+     stays the cleanest thing on the page — bumped up a touch. */
+  filter: blur(.375px) contrast(145%);
+}
+@media (max-width:760px){
+  header.site .brand{ filter: blur(.15px) contrast(115%); }
+}
+/* On any page but home, the name is also the way back — hovering it
+   underlines, same red, same rule as every other link on the site.
+   On home there's nowhere to go back to, so no underline. */
+.not-home header.site .brand:hover{
+  text-decoration:underline;
+  text-decoration-color:var(--red);
+  text-underline-offset:3px;
+  text-decoration-thickness:1px;
+}
+header.site nav{ display:flex; gap: 22px; }
+header.site nav a{ font-size:.8rem; }
+
+@media (max-width:640px){
+  header.site nav{ gap:14px; }
+}
+
+/* ---------------- app shell ---------------- */
+#app{ min-height:100vh; padding-top:64px; padding-bottom:14vh; }
+.field{ position:relative; width:100%; padding: 0 var(--gutter); }
+
+.pause-xs{ height: clamp(28px, 5vh, 56px); }
+.pause-s{ height: clamp(56px, 9vh, 110px); }
+.pause-m{ height: clamp(100px, 16vh, 210px); }
+.pause-l{ height: clamp(170px, 26vh, 340px); }
+.pause-xl{ height: clamp(240px, 38vh, 480px); }
+
+/* ---------------- photograph / placeholder ---------------- */
+.photo{
+  position:relative; overflow:hidden;
+  background:#F1EFEC; /* flat neutral — "image will be here", not a simulated photo */
+}
+.photo img{ width:100%; display:block; }
+
+.photo-caption{
+  margin-top:9px; font-size:.72rem; color:var(--muted);
+}
+
+/* ---------------- image event wrapper ---------------- */
+.event{ display:flex; width:100%; }
+.event.left{ justify-content:flex-start; }
+.event.right{ justify-content:flex-end; }
+.event.center{ justify-content:center; }
+
+/* predefined scale system */
+.sc-xs   { width:min(220px, 46vw); }
+.sc-s    { width:min(340px, 60vw); }
+.sc-m    { width:min(500px, 78vw); }
+.sc-l    { width:min(700px, 86vw); }
+.sc-xl   { width:min(920px, 94vw); }
+.sc-full { width:100%; }
+
+.r-16-9{ aspect-ratio:16/9; }
+.r-3-2 { aspect-ratio:3/2; }
+.r-4-5 { aspect-ratio:4/5; }
+.r-3-4 { aspect-ratio:3/4; }
+.r-2-3 { aspect-ratio:2/3; }
+.r-1-1 { aspect-ratio:1/1; }
+.r-9-16{ aspect-ratio:9/16; }
+
+@media (max-width:760px){
+  .sc-l,.sc-xl{ width:100%; }
+  .sc-m{ width:min(90vw, 460px); }
+}
+
+/* ---------------- text fragments / meta ---------------- */
+.fragment{
+  max-width: 32ch;
+  font-family:var(--font-body);
+  font-size:.92rem; line-height:1.75; color:var(--ink);
+}
+.fragment.right{ margin-left:auto; text-align:right; }
+
+.meta{
+  font-size:.78rem; color:var(--muted);
+  line-height:1.9;
+}
+.meta strong{ color:var(--ink); font-weight:500; }
+
+/* ---------------- discreet index counter ---------------- */
+.counter{
+  position:fixed; right: var(--gutter); bottom: calc(env(safe-area-inset-bottom,0px) + 18px);
+  font-size:.68rem; color:var(--muted);
+  z-index:30; pointer-events:none;
+}
+
+/* ---------------- project title inline label ---------------- */
+.label-inline{
+  font-size:.78rem; color:var(--muted);
+}
+
+/* ---------------- footer nav row ---------------- */
+.nextprev{
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding: 0 var(--gutter);
+  margin: 14vh var(--gutter) 0;
+}
+.nextprev a{ font-size:.78rem; }
+
+.archive-link{ font-size:.78rem; }
+
+/* ---------------- site footer ---------------- */
+.site-footer{
+  display:flex; justify-content:space-between; align-items:baseline;
+  padding: 16px var(--gutter);
+  margin-top: 10vh;
+  border-top:1px solid var(--line);
+}
+.site-footer span{ font-size:.72rem; color:var(--muted); }
+.site-footer a{ font-size:.72rem; }
+/* on pages too short to scroll (About/Contact), "Go to top" stays —
+   it's part of the footer's own rhythm — but struck through, so it
+   reads as on-purpose rather than a broken link. Clicking it anyway
+   reveals a small aside instead of doing nothing silently. */
+.footer-left{ display:inline-flex; align-items:baseline; gap:8px; }
+.site-footer a.no-top{ text-decoration:line-through; text-decoration-color:var(--muted); }
+.no-top-msg{ font-size:.72rem; color:var(--muted); }
+
+/* ---------------- work index ---------------- */
+.index-list{ padding: 0 var(--gutter); }
+.index-item{
+  display:grid; grid-template-columns: 28px 90px 100px 1fr; gap:18px; align-items:baseline;
+  padding: 16px 0; border-top:1px solid var(--line);
+}
+.index-list .index-item:last-child{ border-bottom:1px solid var(--line); }
+.index-item .no{ font-size:.72rem; color:var(--muted); font-variant-numeric:tabular-nums; }
+.index-item .cat{ font-size:.72rem; color:var(--muted); }
+.index-item .yr{ font-size:.72rem; color:var(--muted); }
+.index-item .ti{ font-family:var(--font-body); font-size:.92rem; }
+.index-head{
+  padding: 0 var(--gutter); margin-bottom:8px;
+  font-size:.78rem; color:var(--muted);
+}
+@media (max-width:560px){
+  .index-item{ grid-template-columns: 20px 70px 80px 1fr; gap:10px; }
+}
+
+/* ---------------- simple page (about / contact) ---------------- */
+.page-simple{ max-width:520px; padding: 6vh var(--gutter) 0; }
+.page-simple h1{
+  font-family:var(--font-body); color:var(--ink);
+  font-size:.92rem; font-weight:400; margin:0 0 8vh;
+}
+/* the name treatment (New Berolina MT, red) belongs to 'Emmi Lacaux'
+   only — never reused for a plain heading like 'Contact'. */
+.page-simple h1.brand-name{
+  font-family:var(--font-name); font-style:italic; color:var(--red);
+  font-size:1.5rem; font-weight:400;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+  -webkit-text-stroke:0;
+  text-shadow:none;
+  /* a touch of the same digitized texture as the body text, at a lower
+     dose — enough to feel part of the same visual language, not enough
+     to fight the name's own legibility as the one big appearance. */
+  filter: blur(.3px) contrast(140%);
+}
+.page-simple p{ font-size:.92rem; line-height:1.85; color:var(--ink); margin:0 0 1.6em; max-width:50ch; }
+.page-simple .field-label{ font-size:.72rem; color:var(--muted); margin-bottom:6px; }
+.page-simple .stack{ display:flex; flex-direction:column; gap:34px; margin-top:7vh; }
+.page-simple .field-value{ color:var(--ink); }
+.page-simple .contact-link{ font-size:.98rem; }
+
+/* ---------------- project head ---------------- */
+.project-head{ padding: 0 var(--gutter); margin-bottom: 14vh; }
+.project-head .title{
+  font-size:1.15rem; letter-spacing:.02em; margin:0 0 14px; font-weight:500;
+}
+.project-head .meta{ display:flex; gap:16px; flex-wrap:wrap; }
+
+/* (reveal-on-scroll system removed — content exists immediately, nothing animates in) */
+
+a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-offset:3px; }
+.scroll-x{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+</style>
+</head>
+<body>
+
+<header class="site">
+  <a class="brand" href="#/">Emmi Lacaux</a>
+  <nav id="nav"></nav>
+</header>
+
+<main id="app"></main>
+<div class="counter" id="counter"></div>
+
+<script>
+/* ==============================================================
+   DATA
+   ============================================================== */
+const PROJECTS = [
+  {
+    slug: 'galactica-ibiza-2026',
+    title: 'Galactica — Ibiza 2026',
+    year: '2026',
+    date: 'May – Sep 2026',
+    location: 'Ibiza, Spain',
+    category: 'Photography',
+    medium: 'Photography',
+    description: "Ibiza, June to September. Nights, faces, empty rooms, the light before it gets too hot to stay outside.",
+    titlePosition: 'start', // start | inline | late
+    order: 1,
+    sequence: [
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P1011636.JPG' },
+      { type:'pause', size:'m' },
+      { type:'image', scale:'sc-l', align:'right',  src:'photos/galactica-ibiza-2026/P1011533.JPG' },
+      { type:'pause', size:'l' },
+      { type:'text',  text:'Blurry memories from the best of this summer — love to everyone who was part of my path.', align:'right' },
+      { type:'pause', size:'l' },
+      { type:'image', scale:'sc-l', align:'center', src:'photos/galactica-ibiza-2026/P1011897.JPG' },
+      { type:'pause', size:'s' },
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P1011492.JPG' },
+      { type:'pause', size:'xl' },
+      { type:'image', scale:'sc-l', align:'right',  src:'photos/galactica-ibiza-2026/P1011876.JPG' },
+      { type:'pause', size:'m' },
+      { type:'image', scale:'sc-l', align:'center', src:'photos/galactica-ibiza-2026/P1011653.JPG' },
+      { type:'pause', size:'l' },
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P7151313.JPG' },
+      { type:'pause', size:'s' },
+      { type:'image', scale:'sc-l', align:'right',  src:'photos/galactica-ibiza-2026/P1011469.JPG' },
+      { type:'pause', size:'m' },
+      { type:'image', scale:'sc-l', align:'center', src:'photos/galactica-ibiza-2026/P1011883.JPG' },
+      { type:'pause', size:'l' },
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P1011892.JPG' },
+      { type:'pause', size:'m' },
+      { type:'image', scale:'sc-l', align:'right',  src:'photos/galactica-ibiza-2026/P1011904.JPG' },
+      { type:'pause', size:'m' },
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P1011639.JPG' },
+      { type:'pause', size:'s' },
+      { type:'image', scale:'sc-l', align:'center', src:'photos/galactica-ibiza-2026/P7151307.JPG' },
+      { type:'pause', size:'xl' },
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P7151298.JPG' },
+      { type:'pause', size:'m' },
+      { type:'image', scale:'sc-l', align:'right',  src:'photos/galactica-ibiza-2026/P1011901.JPG' },
+      { type:'pause', size:'l' },
+      { type:'image', scale:'sc-l', align:'center', src:'photos/galactica-ibiza-2026/P1011914.JPG' },
+      { type:'pause', size:'s' },
+      { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P1011929.JPG' },
+      { type:'pause', size:'xl' },
+      { type:'text',  text:'Gente fuerte — thank you Galactica, you did somthing great.', align:'left' },
+    ]
+  }
+];
+
+function proj(slug){ return PROJECTS.find(p=>p.slug===slug); }
+function orderedProjects(){ return [...PROJECTS].sort((a,b)=>(a.order||0)-(b.order||0)); }
+
+function countImages(sequence){ return sequence.filter(s=>s.type==='image').length; }
+
+function photoDiv({ratio='r-3-2', scale='sc-m', align='left', caption, src, alt='', credit, number}){
+  // NOTE: there is no reveal/appear animation anywhere on the site —
+  // the reveal-on-scroll system was removed. Every element, image or
+  // text, is simply present in the DOM from the start.
+  //
+  // Real photography: pass `src` (and `alt`) on a sequence item. The
+  // <img> renders at its own natural aspect ratio (no object-fit:cover,
+  // no forced crop, no `ratio` box) — portrait stays portrait, landscape
+  // stays landscape. `ratio` is only used to shape the flat neutral
+  // placeholder box before a real photograph exists.
+  const wrap = document.createElement('div');
+  wrap.className = `event ${align}`;
+  const inner = document.createElement('div');
+  inner.className = `${scale}`;
+
+  const p = document.createElement('div');
+  if(src){
+    p.className = 'photo';
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = alt || '';
+    img.loading = 'eager';
+    p.appendChild(img);
+  } else {
+    p.className = `photo ${ratio}`; // neutral box only, no gradient — "image will be here"
+  }
+  inner.appendChild(p);
+
+  if(caption || credit || number){
+    const c = document.createElement('div');
+    c.className = 'photo-caption';
+    c.textContent = [number, caption, credit].filter(Boolean).join('  —  ');
+    inner.appendChild(c);
+  }
+  wrap.appendChild(inner);
+  wrap.dataset.isImage = '1';
+  return wrap;
+}
+
+function textDiv(text, align='left'){
+  const wrap = document.createElement('div');
+  wrap.className = `event ${align==='right'?'right':'left'}`;
+  const inner = document.createElement('div');
+  inner.className = `fragment ${align==='right'?'right':''}`;
+  inner.textContent = text;
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+function labelDiv(text){
+  const wrap = document.createElement('div');
+  wrap.className = 'field';
+  wrap.style.padding = '0';
+  const inner = document.createElement('div');
+  inner.className = 'label-inline';
+  inner.textContent = text;
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+function pauseDiv(size='m'){
+  const d = document.createElement('div');
+  d.className = `pause-${size}`;
+  return d;
+}
+
+function renderSequence(container, sequence){
+  sequence.forEach(item=>{
+    if(item.type === 'image') container.appendChild(photoDiv(item));
+    else if(item.type === 'text') container.appendChild(textDiv(item.text, item.align));
+    else if(item.type === 'label') container.appendChild(labelDiv(item.text));
+    else if(item.type === 'pause') container.appendChild(pauseDiv(item.size));
+  });
+}
+
+function appendFooter(app, opts={}){
+  const f = document.createElement('div');
+  f.className = 'site-footer';
+  f.innerHTML = `
+    <span class="footer-left">
+      <a class="link${opts.noTop ? ' no-top' : ''}" href="#top" data-top="1">Go to top</a>${opts.noTop ? '<span class="no-top-msg" hidden>no where to go</span>' : ''}
+    </span>
+    <span>Archive / 2026</span>
+  `;
+  app.appendChild(f);
+  const topLink = f.querySelector('[data-top]');
+  let noTopTimer;
+  topLink.addEventListener('click', (e)=>{
+    e.preventDefault();
+    if(opts.noTop){
+      const msg = f.querySelector('.no-top-msg');
+      msg.hidden = false;
+      clearTimeout(noTopTimer);
+      noTopTimer = setTimeout(()=>{ msg.hidden = true; }, 2200);
+    } else {
+      window.scrollTo(0,0);
+    }
+  });
+}
+
+/* ---------------------------- pages ---------------------------- */
+
+function renderHome(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+  const field = document.createElement('div');
+  field.className = 'field';
+
+  const p = PROJECTS[0];
+  let total = 0;
+  if(p){
+    total = countImages(p.sequence);
+    renderSequence(field, p.sequence);
+    field.appendChild(pauseDiv('l'));
+
+    const linkRow = document.createElement('div');
+    linkRow.className = 'event center';
+    linkRow.innerHTML = `<a class="link archive-link" href="#/work/${p.slug}">01 — ${p.title}</a>`;
+    field.appendChild(linkRow);
+    field.appendChild(pauseDiv('l'));
+  }
+  app.appendChild(field);
+  appendFooter(app);
+  setupCounter(total);
+}
+
+function renderWork(){
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'index-head';
+  head.textContent = 'Index';
+  app.appendChild(head);
+
+  const list = document.createElement('div');
+  list.className = 'index-list';
+  orderedProjects().forEach((p, i)=>{
+    const row = document.createElement('div');
+    row.className = 'index-item';
+    row.innerHTML = `
+      <div class="no">${String(i+1).padStart(2,'0')}</div>
+      <div class="cat">${p.category}</div>
+      <div class="yr">${p.year}</div>
+      <div class="ti"><a class="link" href="#/work/${p.slug}">${p.title}</a></div>
+    `;
+    list.appendChild(row);
+  });
+  app.appendChild(list);
+  appendFooter(app);
+  setupCounter(null);
+}
+
+function renderProject(slug){
+  const app = document.getElementById('app');
+  const p = proj(slug);
+  app.innerHTML = '';
+  if(!p){
+    app.innerHTML = `<div class="page-simple"><h1>Not found</h1><p><a class="link" href="#/work">Back to work</a></p></div>`;
+    setupCounter(null);
+    return;
+  }
+
+  const head = document.createElement('div');
+  head.className = 'project-head';
+  head.innerHTML = `
+    <div class="title">${p.title}</div>
+    <div class="meta">
+      <span>${p.category}</span>
+      <span>${p.location}</span>
+      <span>${p.date}</span>
+    </div>
+  `;
+  app.appendChild(head);
+
+  const field = document.createElement('div');
+  field.className = 'field';
+  renderSequence(field, p.sequence);
+  app.appendChild(field);
+
+  const all = orderedProjects();
+  const idx = all.findIndex(x=>x.slug===slug);
+  const next = all[(idx+1) % all.length];
+
+  const nav = document.createElement('div');
+  nav.className = 'nextprev';
+  nav.innerHTML = `
+    <a class="link" href="#/work">Back to work</a>
+    ${next && next.slug !== slug ? `<a class="link" href="#/work/${next.slug}">Next project</a>` : ''}
+  `;
+  app.appendChild(nav);
+  appendFooter(app);
+
+  setupCounter(countImages(p.sequence));
+}
+
+function renderAbout(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="page-simple">
+      <p>Born in Ibiza, the path has always been to create, express, learn, and nurture the thinking souls that cross the same trail — and so, maybe, little by little, understand a bit more about oneself in a life of overwhelming possibilities.</p>
+      <p>The work moves between documentation and memory — an ongoing archive rather than a finished body of work.</p>
+      <div class="stack">
+        <div>
+          <div class="field-label">Based in</div>
+          <div class="field-value">Ibiza & Valencia, Spain</div>
+        </div>
+        <div>
+          <div class="field-label">Practices</div>
+          <div class="field-value">Photography / Writing / Video / Music / Techno</div>
+        </div>
+      </div>
+    </div>
+  `;
+  appendFooter(document.getElementById('app'), {noTop:true});
+  setupCounter(null);
+}
+
+function renderContact(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="page-simple">
+      <div class="stack" style="margin-top:0">
+        <div>
+          <div class="field-label">Instagram</div>
+          <a class="link contact-link" href="https://instagram.com/emmilacaux" target="_blank" rel="noopener">@emmilacaux</a>
+        </div>
+        <div>
+          <div class="field-label">Email</div>
+          <a class="link contact-link" href="mailto:emmilacaux@gmail.com">emmilacaux@gmail.com</a>
+        </div>
+        <div>
+          <div class="field-label">SoundCloud</div>
+          <a class="link contact-link" href="https://soundcloud.com/emmi-lacaux" target="_blank" rel="noopener">Emmi Lacaux</a>
+        </div>
+      </div>
+    </div>
+  `;
+  appendFooter(document.getElementById('app'), {noTop:true});
+  setupCounter(null);
+}
+
+/* ---------------------------- router ---------------------------- */
+
+function renderNav(active){
+  document.body.classList.toggle('not-home', !!active);
+  const nav = document.getElementById('nav');
+  const items = [
+    {href:'#/work', label:'Work', key:'work'},
+    {href:'#/about', label:'About', key:'about'},
+    {href:'#/contact', label:'Contact', key:'contact'},
+  ];
+  nav.innerHTML = items.map(i=>`<a href="${i.href}" class="link${active===i.key?' active':''}">${i.label}</a>`).join('');
+}
+
+function route(){
+  const hash = location.hash.replace(/^#/, '') || '/';
+  const parts = hash.split('/').filter(Boolean);
+  window.scrollTo(0,0);
+
+  if(parts.length === 0){ renderNav(''); renderHome(); }
+  else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); }
+  else if(parts[0] === 'work' && parts.length === 2){ renderNav('work'); renderProject(parts[1]); }
+  else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); }
+  else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); }
+  else { renderNav(''); renderHome(); }
+}
+
+window.addEventListener('hashchange', route);
+window.addEventListener('DOMContentLoaded', route);
+
+/* ---------------------------- discreet image counter ---------------------------- */
+let counterObserver;
+function setupCounter(total){
+  const el = document.getElementById('counter');
+  if(counterObserver) counterObserver.disconnect();
+  if(!total){ el.textContent = ''; return; }
+  const imgs = Array.from(document.querySelectorAll('[data-is-image="1"]'));
+  el.textContent = `01 / ${String(total).padStart(2,'0')}`;
+  counterObserver = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        const i = imgs.indexOf(e.target) + 1;
+        if(i > 0) el.textContent = `${String(i).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
+      }
+    });
+  }, { threshold: 0.5 });
+  imgs.forEach(im=>counterObserver.observe(im));
+}
+
+/* ---------------------------- font verification ---------------------------- */
+window.addEventListener('load', ()=>{
+  document.fonts.ready.then(()=>{
+    console.info('[fonts] New Berolina MT loaded:', document.fonts.check("16px 'New Berolina MT'"));
+    console.info('[fonts] Generic G20-FR Classic loaded:', document.fonts.check("16px 'Generic G20-FR Classic'"));
+  });
+});
+</script>
+</body>
+</html>
