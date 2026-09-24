@@ -116,25 +116,6 @@ img,svg{ max-width:100%; display:block; }
 .page-simple .contact-link, .link{
   filter: blur(.6px) contrast(200%);
 }
-/* Every magnitude of CSS `filter: blur()` on text — from .1px to the
-   full .6px, and various @supports/UA-sniffed browser targeting —
-   rendered as thick blobs on phone screens. The bug is in how mobile
-   browsers composite a live CSS filter over the text layer, not in the
-   blur math itself. So on narrow viewports the live filter is off
-   entirely, and a script (bottom of page) bakes the identical
-   blur(.6px) contrast(200%) look into a Canvas-2D-rendered image per
-   text element instead — canvas's own filter rasterizes to a finished
-   bitmap with no compositing step left for a phone to get wrong. See
-   `rasterizeMobileText()` in the script. */
-@media (max-width:760px){
-  .photo-caption, .fragment, .label-inline, .counter, .meta,
-  .nextprev a, .site-footer, .project-head .title, .index-item,
-  .index-head, .page-simple h1:not(.brand-name), .page-simple p,
-  .page-simple .field-label, .page-simple .field-value,
-  .page-simple .contact-link, .link{
-    filter: none;
-  }
-}
 a{ color:inherit; text-decoration:none; }
 ::selection{ background:transparent; color:var(--red); text-decoration:underline; text-decoration-color:var(--red); text-decoration-thickness:1px; transition:none !important; }
 
@@ -215,9 +196,6 @@ header.site .brand{
   /* lighter dose of the digitized texture than body text, so the name
      stays the cleanest thing on the page — bumped up a touch. */
   filter: blur(.375px) contrast(145%);
-}
-@media (max-width:760px){
-  header.site .brand{ filter: none; }
 }
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
@@ -550,7 +528,7 @@ function appendFooter(app, opts={}){
     <span class="footer-left">
       <a class="link${opts.noTop ? ' no-top' : ''}" href="#top" data-top="1">Go to top</a>${opts.noTop ? '<span class="no-top-msg" hidden>no where to go</span>' : ''}
     </span>
-    <span class="archive-date">Archive / 2026</span>
+    <span>Archive / 2026</span>
   `;
   app.appendChild(f);
   const topLink = f.querySelector('[data-top]');
@@ -560,7 +538,6 @@ function appendFooter(app, opts={}){
     if(opts.noTop){
       const msg = f.querySelector('.no-top-msg');
       msg.hidden = false;
-      if (isMobileView()) rasterizeOne(msg);
       clearTimeout(noTopTimer);
       noTopTimer = setTimeout(()=>{ msg.hidden = true; }, 2200);
     } else {
@@ -711,186 +688,6 @@ function renderContact(){
   setupCounter(null);
 }
 
-/* ---------------------------- mobile text rasterization ----------------------------
-   CSS `filter: blur()` on text renders as thick blobs on phone screens (see the
-   comment above the mobile @media block) — every magnitude tried, in every mobile
-   browser, not one engine. The bug is in how phones composite a *live* CSS filter
-   over the text layer. Canvas 2D's own `ctx.filter`, run once here per element,
-   bakes blur+contrast into a finished bitmap instead — same technique already
-   proven on assets/cursor-x.png and assets/scrollbar-dash.png. That bitmap is
-   painted as a background-image positioned exactly over the (now transparent-inked)
-   real text, so the actual text, its click targets and its accessibility all stay
-   exactly where they were — only the pixels used to paint it change. Runs only on
-   narrow (mobile) viewports; desktop keeps the plain live CSS filter, unaffected. */
-const MOBILE_TEXT_SELECTOR = '.photo-caption, .fragment, .label-inline, .counter, ' +
-  '.meta span, .site-footer .archive-date, .no-top-msg, .project-head .title, ' +
-  '.index-item .no, .index-item .cat, .index-item .yr, .index-head, ' +
-  '.page-simple h1:not(.brand-name), .page-simple p, .page-simple .field-label, ' +
-  '.page-simple .field-value, .link, header.site .brand';
-
-function isMobileView(){ return window.matchMedia('(max-width:760px)').matches; }
-
-function clearRasterizedText(){
-  document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
-    el.style.removeProperty('background-image');
-    el.style.removeProperty('background-size');
-    el.style.removeProperty('background-repeat');
-    el.style.removeProperty('background-position');
-    el.style.removeProperty('color');
-    el.style.removeProperty('-webkit-text-fill-color');
-    el.style.removeProperty('display');
-    el.style.removeProperty('width');
-    el.style.removeProperty('height');
-  });
-}
-
-/* Manual blur+contrast on the alpha channel — not ctx.filter. Canvas 2D's
-   `filter` property is silently unsupported (a no-op, no error) on some
-   real Safari builds, which is why text rasterized with it came out
-   perfectly crisp instead of textured. getImageData/putImageData pixel
-   math has no such gap — it's core Canvas2D, supported everywhere. Blur
-   softens alpha (our ink is a flat fill color; only the anti-aliased
-   edge *coverage* varies), contrast then pushes that edge harder, which
-   is what reads as "bolder/digitized" the same way the CSS filter did. */
-function boxBlurAlpha(imageData, radius){
-  const r = Math.max(1, Math.round(radius));
-  const { data, width, height } = imageData;
-  const tmp = new Float32Array(width * height);
-  for (let y = 0; y < height; y++){
-    for (let x = 0; x < width; x++){
-      let sum = 0, count = 0;
-      for (let dx = -r; dx <= r; dx++){
-        const nx = x + dx;
-        if (nx >= 0 && nx < width){ sum += data[(y * width + nx) * 4 + 3]; count++; }
-      }
-      tmp[y * width + x] = sum / count;
-    }
-  }
-  for (let x = 0; x < width; x++){
-    for (let y = 0; y < height; y++){
-      let sum = 0, count = 0;
-      for (let dy = -r; dy <= r; dy++){
-        const ny = y + dy;
-        if (ny >= 0 && ny < height){ sum += tmp[ny * width + x]; count++; }
-      }
-      data[(y * width + x) * 4 + 3] = Math.round(sum / count);
-    }
-  }
-}
-
-function contrastAlpha(imageData, contrastPct){
-  const factor = contrastPct / 100;
-  const { data } = imageData;
-  for (let i = 3; i < data.length; i += 4){
-    const a = (data[i] / 255 - 0.5) * factor + 0.5;
-    data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
-  }
-}
-
-function wrapCanvasText(ctx, text, maxWidth){
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines = [];
-  let line = '';
-  words.forEach(word=>{
-    const test = line ? line + ' ' + word : word;
-    if (line && ctx.measureText(test).width > maxWidth) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  });
-  if (line) lines.push(line);
-  return lines;
-}
-
-function rasterizeOne(el){
-  const text = (el.textContent || '').trim();
-  if (!text) return;
-  const width = Math.ceil(el.getBoundingClientRect().width);
-  if (!width) return;
-
-  const cs = getComputedStyle(el);
-  // Picked on a real phone from 8 side-by-side options (mobile-blur-test.html) —
-  // not the desktop blur(.6px)/contrast(200%) values scaled down, an
-  // independently chosen radius/contrast pair that actually reads right here.
-  const isBrand = el.matches('header.site .brand');
-  const blurPx = 1;
-  const contrastPct = isBrand ? 130 : 150;
-
-  const fontSize = parseFloat(cs.fontSize) || 14;
-  let lineHeight = parseFloat(cs.lineHeight);
-  if (!lineHeight || isNaN(lineHeight)) lineHeight = fontSize * 1.3;
-  const textAlign = cs.textAlign === 'start' ? 'left' : cs.textAlign;
-  const font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
-
-  const measure = document.createElement('canvas').getContext('2d');
-  measure.font = font;
-  const lines = wrapCanvasText(measure, text, width);
-  const height = Math.ceil(lines.length * lineHeight);
-  if (!height) return;
-
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(width * dpr);
-  canvas.height = Math.ceil(height * dpr);
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.font = font;
-  ctx.fillStyle = cs.color;
-  ctx.textBaseline = 'top';
-  lines.forEach((line, i)=>{
-    const lineWidth = ctx.measureText(line).width;
-    let x = 0;
-    if (textAlign === 'center') x = (width - lineWidth) / 2;
-    else if (textAlign === 'right') x = width - lineWidth;
-    ctx.fillText(line, x, i * lineHeight);
-  });
-
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  boxBlurAlpha(imgData, blurPx * dpr);
-  contrastAlpha(imgData, contrastPct);
-  ctx.putImageData(imgData, 0, 0);
-
-  // A wrapped `display:inline` box (e.g. a project title <a> that spans two
-  // lines) paints its background per line-fragment, not as one continuous
-  // image — inconsistently across browsers. inline-block gives it a single
-  // unfragmented box instead, sized to match the canvas exactly.
-  if (cs.display === 'inline') {
-    el.style.setProperty('display', 'inline-block');
-    el.style.setProperty('width', `${width}px`);
-  }
-  el.style.setProperty('height', `${height}px`);
-  el.style.setProperty('background-image', `url(${canvas.toDataURL('image/png')})`);
-  el.style.setProperty('background-size', `${width}px ${height}px`);
-  el.style.setProperty('background-repeat', 'no-repeat');
-  el.style.setProperty('background-position', 'left top');
-  el.style.setProperty('color', 'transparent');
-  el.style.setProperty('-webkit-text-fill-color', 'transparent');
-}
-
-let rasterizeScheduled = false;
-function rasterizeMobileText(){
-  if (rasterizeScheduled) return;
-  rasterizeScheduled = true;
-  requestAnimationFrame(()=>{
-    rasterizeScheduled = false;
-    clearRasterizedText();
-    if (!isMobileView()) return;
-    document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
-      if (el.hidden || el.offsetParent === null) return; // skip hidden (e.g. .no-top-msg before its first click)
-      rasterizeOne(el);
-    });
-  });
-}
-
-let mobileTextResizeTimer;
-window.addEventListener('resize', ()=>{
-  clearTimeout(mobileTextResizeTimer);
-  mobileTextResizeTimer = setTimeout(rasterizeMobileText, 200);
-});
-document.fonts.ready.then(rasterizeMobileText);
-
 /* ---------------------------- router ---------------------------- */
 
 function renderNav(active){
@@ -915,8 +712,6 @@ function route(){
   else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); }
   else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); }
   else { renderNav(''); renderHome(); }
-
-  rasterizeMobileText();
 }
 
 window.addEventListener('hashchange', route);
@@ -930,13 +725,11 @@ function setupCounter(total){
   if(!total){ el.textContent = ''; return; }
   const imgs = Array.from(document.querySelectorAll('[data-is-image="1"]'));
   el.textContent = `01 / ${String(total).padStart(2,'0')}`;
-  if (isMobileView()) rasterizeOne(el);
   counterObserver = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{
       if(e.isIntersecting){
         const i = imgs.indexOf(e.target) + 1;
         if(i > 0) el.textContent = `${String(i).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
-        if (isMobileView()) rasterizeOne(el);
       }
     });
   }, { threshold: 0.5 });
