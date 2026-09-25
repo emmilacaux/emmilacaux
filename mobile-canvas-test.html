@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mobile Canvas Test</title>
+<style>
+@font-face{
+  font-family:'Generic G20-FR Classic';
+  src: url('fonts/Generic-G20-FR-Classic-DEMO.otf') format('opentype');
+  font-display: swap;
+}
+body{
+  background:#fff; color:#111;
+  font-family:'Generic G20-FR Classic', sans-serif;
+  margin:0; padding: 24px 20px 80px;
+}
+h1{ font-size:.85rem; font-weight:400; margin:0 0 8px; }
+.intro{ font-size:.72rem; color:#5E5A57; line-height:1.6; margin:0 0 28px; }
+.row{ padding: 18px 0; border-top:1px solid #D7D2CE; }
+.row:last-child{ border-bottom:1px solid #D7D2CE; }
+.tag{ font-size:.68rem; color:#8B1114; margin-bottom:8px; }
+.sample{ font-size:14px; line-height:1.85; max-width: 32ch; }
+</style>
+</head>
+<body>
+
+<h1>Blur manual por matemática de píxeles — no filtro del navegador</h1>
+<p class="intro">Nada de `filter` CSS ni de canvas `ctx.filter` — esto calcula el blur a mano, promediando píxeles reales. No depende de ningún mínimo que imponga el navegador. Tamaño real 14px. Decime el número que se vea más parecido a la sensación de escritorio.</p>
+
+<div class="row"><div class="tag">M1 — radius 0.3, contrast 130%</div><div class="sample" id="m1">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M2 — radius 0.3, contrast 160%</div><div class="sample" id="m2">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M3 — radius 0.5, contrast 130%</div><div class="sample" id="m3">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M4 — radius 0.5, contrast 160%</div><div class="sample" id="m4">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M5 — radius 0.7, contrast 130%</div><div class="sample" id="m5">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M6 — radius 0.7, contrast 160%</div><div class="sample" id="m6">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M7 — radius 1, contrast 130%</div><div class="sample" id="m7">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M8 — radius 1, contrast 160%</div><div class="sample" id="m8">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">M9 — radius 1.3, contrast 140%</div><div class="sample" id="m9">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">Control — sin efecto (texto real, sin canvas)</div><div class="sample">Blurry memories from the best of this summer.</div></div>
+
+<script>
+// Fractional-radius box blur on the alpha channel: each output pixel is a
+// weighted average of a (2*radius+1)-wide window, where the two edge
+// samples get partial weight equal to the fractional part of radius. This
+// is what lets radius be something like 0.3 or 0.7, not just a whole
+// number of pixels.
+function boxBlurAlpha(imageData, radius){
+  if (radius <= 0) return;
+  const { data, width, height } = imageData;
+  const r = Math.floor(radius);
+  const frac = radius - r;
+  const tmp = new Float32Array(width * height);
+  for (let y = 0; y < height; y++){
+    for (let x = 0; x < width; x++){
+      let sum = 0, weight = 0;
+      for (let dx = -r; dx <= r; dx++){
+        const nx = x + dx;
+        if (nx >= 0 && nx < width){ sum += data[(y * width + nx) * 4 + 3]; weight += 1; }
+      }
+      if (frac > 0){
+        const lx = x - r - 1, rx = x + r + 1;
+        if (lx >= 0){ sum += data[(y * width + lx) * 4 + 3] * frac; weight += frac; }
+        if (rx < width){ sum += data[(y * width + rx) * 4 + 3] * frac; weight += frac; }
+      }
+      tmp[y * width + x] = sum / weight;
+    }
+  }
+  for (let x = 0; x < width; x++){
+    for (let y = 0; y < height; y++){
+      let sum = 0, weight = 0;
+      for (let dy = -r; dy <= r; dy++){
+        const ny = y + dy;
+        if (ny >= 0 && ny < height){ sum += tmp[ny * width + x]; weight += 1; }
+      }
+      if (frac > 0){
+        const ly = y - r - 1, ry = y + r + 1;
+        if (ly >= 0){ sum += tmp[ly * width + x] * frac; weight += frac; }
+        if (ry < height){ sum += tmp[ry * width + x] * frac; weight += frac; }
+      }
+      data[(y * width + x) * 4 + 3] = Math.round(sum / weight);
+    }
+  }
+}
+function contrastAlpha(imageData, contrastPct){
+  const factor = contrastPct / 100;
+  const { data } = imageData;
+  for (let i = 3; i < data.length; i += 4){
+    const a = (data[i] / 255 - 0.5) * factor + 0.5;
+    data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
+  }
+}
+function rasterize(el, radius, contrastPct){
+  const text = el.textContent.trim();
+  const width = Math.ceil(el.getBoundingClientRect().width);
+  const cs = getComputedStyle(el);
+  const fontSize = parseFloat(cs.fontSize) || 14;
+  const lineHeight = parseFloat(cs.lineHeight) || fontSize * 1.3;
+  const font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const words = text.split(/\s+/);
+  const lines = [];
+  let line = '';
+  words.forEach(w=>{
+    const t = line ? line + ' ' + w : w;
+    if (line && measure.measureText(t).width > width) { lines.push(line); line = w; }
+    else line = t;
+  });
+  if (line) lines.push(line);
+  const height = Math.ceil(lines.length * lineHeight);
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(width * dpr);
+  canvas.height = Math.ceil(height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.font = font;
+  ctx.fillStyle = cs.color;
+  ctx.textBaseline = 'top';
+  lines.forEach((l, i) => ctx.fillText(l, 0, i * lineHeight));
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  boxBlurAlpha(imgData, radius * dpr);
+  contrastAlpha(imgData, contrastPct);
+  ctx.putImageData(imgData, 0, 0);
+  el.style.height = height + 'px';
+  el.style.backgroundImage = `url(${canvas.toDataURL('image/png')})`;
+  el.style.backgroundSize = `${width}px ${height}px`;
+  el.style.backgroundRepeat = 'no-repeat';
+  el.style.color = 'transparent';
+}
+document.fonts.ready.then(()=>{
+  rasterize(document.getElementById('m1'), 0.3, 130);
+  rasterize(document.getElementById('m2'), 0.3, 160);
+  rasterize(document.getElementById('m3'), 0.5, 130);
+  rasterize(document.getElementById('m4'), 0.5, 160);
+  rasterize(document.getElementById('m5'), 0.7, 130);
+  rasterize(document.getElementById('m6'), 0.7, 160);
+  rasterize(document.getElementById('m7'), 1, 130);
+  rasterize(document.getElementById('m8'), 1, 160);
+  rasterize(document.getElementById('m9'), 1.3, 140);
+});
+</script>
+</body>
+</html>
