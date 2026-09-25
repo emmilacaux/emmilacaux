@@ -407,8 +407,13 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
      added contrast stage). The brand name gets a lighter dose, same 0.6/
      0.375 ratio as the desktop blur(.6px)/blur(.375px) pair, so it stays
      the cleanest thing on the page there too. Zero size + absolute
-     position so it never affects layout; it's referenced, never shown. -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+     position so it never affects layout; it's referenced, never shown -
+     clip:rect(0,0,0,0) and overflow:hidden on top of that (the standard
+     "visually hidden" pattern) because a 0x0 SVG alone still rendered as
+     a small visible black mark in real Safari, scrolling with the page
+     content like anything else in normal flow, even though it reported
+     zero size in every test here. -->
+<svg width="0" height="0" style="position:absolute; overflow:hidden; clip:rect(0,0,0,0); clip-path:inset(50%);" aria-hidden="true">
   <defs>
     <filter id="mobileTextBlur"><feGaussianBlur stdDeviation="0.6"/></filter>
     <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
@@ -775,8 +780,17 @@ function route(){
   // Scroll to top only after the new page's content has replaced the old -
   // doing it before let the browser's scroll anchoring "helpfully" shift
   // the position again once the DOM swap landed, so a route change from a
-  // scrolled-down page could land anywhere but the top.
+  // scrolled-down page could land anywhere but the top. Kept up for a
+  // short burst rather than called once: the overflow:hidden above stops
+  // most in-flight momentum, but on a hard fling on a real device it can
+  // still be playing out a bit after that, and a single scrollTo can still
+  // lose to it.
   window.scrollTo(0,0);
+  let scrollLockFrames = 0;
+  (function holdScrollTop(){
+    window.scrollTo(0,0);
+    if (++scrollLockFrames < 10) requestAnimationFrame(holdScrollTop);
+  })();
 }
 
 window.addEventListener('hashchange', route);
