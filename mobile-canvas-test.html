@@ -37,6 +37,11 @@ h1{ font-size:.85rem; font-weight:400; margin:0 0 8px; }
 <div class="row"><div class="tag">M7 — radius 1, contrast 130%</div><div class="sample" id="m7">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">M8 — radius 1, contrast 160%</div><div class="sample" id="m8">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">M9 — radius 1.3, contrast 140%</div><div class="sample" id="m9">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">N1 — gaussian-approx (3 pasadas), radius 0.35 c/u, contrast 130%</div><div class="sample" id="n1">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">N2 — 3 pasadas, radius 0.35 c/u, contrast 145%</div><div class="sample" id="n2">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">N3 — 3 pasadas, radius 0.45 c/u, contrast 130%</div><div class="sample" id="n3">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">N4 — 3 pasadas, radius 0.45 c/u, contrast 145%</div><div class="sample" id="n4">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">N5 — 3 pasadas, radius 0.3 c/u, contrast 120%</div><div class="sample" id="n5">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">Control — sin efecto (texto real, sin canvas)</div><div class="sample">Blurry memories from the best of this summer.</div></div>
 
 <script>
@@ -82,6 +87,14 @@ function boxBlurAlpha(imageData, radius){
     }
   }
 }
+// 3 passes of a small box blur approximate a Gaussian much better than one
+// big box blur pass — energy concentrates near the center and tapers off,
+// instead of spreading dead-evenly across the whole radius. That taper is
+// what should stop adjacent letters from bridging into each other the way
+// a single large box blur does.
+function gaussianApproxAlpha(imageData, radiusPerPass, passes){
+  for (let i = 0; i < passes; i++) boxBlurAlpha(imageData, radiusPerPass);
+}
 function contrastAlpha(imageData, contrastPct){
   const factor = contrastPct / 100;
   const { data } = imageData;
@@ -90,7 +103,7 @@ function contrastAlpha(imageData, contrastPct){
     data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
   }
 }
-function rasterize(el, radius, contrastPct){
+function rasterize(el, blurFn, contrastPct){
   const text = el.textContent.trim();
   const width = Math.ceil(el.getBoundingClientRect().width);
   const cs = getComputedStyle(el);
@@ -120,7 +133,7 @@ function rasterize(el, radius, contrastPct){
   ctx.textBaseline = 'top';
   lines.forEach((l, i) => ctx.fillText(l, 0, i * lineHeight));
   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  boxBlurAlpha(imgData, radius * dpr);
+  blurFn(imgData, dpr);
   contrastAlpha(imgData, contrastPct);
   ctx.putImageData(imgData, 0, 0);
   el.style.height = height + 'px';
@@ -129,16 +142,24 @@ function rasterize(el, radius, contrastPct){
   el.style.backgroundRepeat = 'no-repeat';
   el.style.color = 'transparent';
 }
+function single(radius){ return (imgData, dpr) => boxBlurAlpha(imgData, radius * dpr); }
+function triple(radiusPerPass){ return (imgData, dpr) => gaussianApproxAlpha(imgData, radiusPerPass * dpr, 3); }
+
 document.fonts.ready.then(()=>{
-  rasterize(document.getElementById('m1'), 0.3, 130);
-  rasterize(document.getElementById('m2'), 0.3, 160);
-  rasterize(document.getElementById('m3'), 0.5, 130);
-  rasterize(document.getElementById('m4'), 0.5, 160);
-  rasterize(document.getElementById('m5'), 0.7, 130);
-  rasterize(document.getElementById('m6'), 0.7, 160);
-  rasterize(document.getElementById('m7'), 1, 130);
-  rasterize(document.getElementById('m8'), 1, 160);
-  rasterize(document.getElementById('m9'), 1.3, 140);
+  rasterize(document.getElementById('m1'), single(0.3), 130);
+  rasterize(document.getElementById('m2'), single(0.3), 160);
+  rasterize(document.getElementById('m3'), single(0.5), 130);
+  rasterize(document.getElementById('m4'), single(0.5), 160);
+  rasterize(document.getElementById('m5'), single(0.7), 130);
+  rasterize(document.getElementById('m6'), single(0.7), 160);
+  rasterize(document.getElementById('m7'), single(1), 130);
+  rasterize(document.getElementById('m8'), single(1), 160);
+  rasterize(document.getElementById('m9'), single(1.3), 140);
+  rasterize(document.getElementById('n1'), triple(0.35), 130);
+  rasterize(document.getElementById('n2'), triple(0.35), 145);
+  rasterize(document.getElementById('n3'), triple(0.45), 130);
+  rasterize(document.getElementById('n4'), triple(0.45), 145);
+  rasterize(document.getElementById('n5'), triple(0.3), 120);
 });
 </script>
 </body>
