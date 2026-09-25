@@ -189,6 +189,19 @@ html{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--bg); }
   transition:none !important;
   animation:none !important;
 }
+/* On mobile this text is made invisible in favor of the rasterized
+   overlay drawn on top of it - it's still real, present, selectable text
+   underneath, though, so holding a tap on it can bring up the OS's text
+   selection UI (a selection box with no visible text to justify it,
+   since what you actually see is the image above). It was never meant to
+   be selected - it's link chrome - so suppress that on mobile only. */
+@media (max-width:760px){
+  .link, header.site .brand{
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+}
 /* (hover:hover) excludes touch: a tap "hovers" a link but there's no
    mouse to leave afterward, so without this guard the red/underline from
    :hover just stays stuck on whatever you last tapped, forever. */
@@ -958,25 +971,8 @@ function rasterizeOne(el, retry){
   const dataUrl = canvas.toDataURL('image/png');
   const pre = new Image();
   pre.src = dataUrl;
-  // Both mobile Chrome and Safari can leave a freshly (re)painted overlay
-  // out of the composited frame after a route change - the element is
-  // correctly sized/positioned/decoded (verified), it's just never
-  // actually drawn until *something* forces a repaint, which is why it
-  // looked fixed by "nothing" (a later unrelated scroll/resize). A src
-  // swap alone doesn't change layout, so reading offsetHeight (which only
-  // forces layout) isn't reliable here - what actually needs forcing is
-  // recompositing. Nudging opacity is the standard trick for that: it's
-  // imperceptible but makes the browser recomposite this element's layer.
-  const forceRepaint = () => {
-    img.style.opacity = '0.999';
-    requestAnimationFrame(()=>{ img.style.opacity = '1'; });
-  };
-  if (pre.decode) {
-    pre.decode().then(()=>{ img.src = dataUrl; forceRepaint(); }).catch(()=>{ img.src = dataUrl; forceRepaint(); });
-  } else {
-    img.src = dataUrl;
-    forceRepaint();
-  }
+  const swapped = (pre.decode ? pre.decode().catch(()=>{}) : Promise.resolve())
+    .then(()=>{ img.src = dataUrl; });
 
   // Real devices can still be mid-layout-shift (late webfont swap, a photo
   // above this element loading in and pushing things around) at the exact
@@ -987,9 +983,10 @@ function rasterizeOne(el, retry){
   if (!retry) {
     const rectNow = el.getBoundingClientRect();
     if (Math.abs(Math.ceil(rectNow.width) - width) > 1 || Math.abs(rectNow.top - rect.top) > 1) {
-      rasterizeOne(el, true);
+      return rasterizeOne(el, true);
     }
   }
+  return swapped;
 }
 
 let rasterizeScheduled = false;
@@ -1000,9 +997,36 @@ function rasterizeMobileText(){
     rasterizeScheduled = false;
     clearRasterizedText();
     if (!isMobileView()) return;
+    // On a cold load the custom fonts can still be fetching. Measuring/
+    // drawing against the fallback font in that window produces overlays
+    // sized and wrapped for a different font than the one the real (now
+    // hidden) text will render in a moment later - close enough to still
+    // look plausible-but-wrong rather than obviously broken, which is
+    // worse. Leave the real text plain and readable instead, and let the
+    // document.fonts.ready listener below run the real pass once the
+    // right font is actually in.
+    if (document.fonts.status !== 'loaded') { document.fonts.ready.then(rasterizeMobileText); return; }
+    const swaps = [];
     document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
       if (el.hidden || el.offsetParent === null) return; // skip hidden (e.g. .no-top-msg before its first click)
-      rasterizeOne(el);
+      swaps.push(rasterizeOne(el));
+    });
+    // Mobile Chrome and Safari can both leave a freshly (re)painted overlay
+    // out of the composited frame - every property checks out (decoded,
+    // correct size/position, opacity settled) but it's simply never drawn
+    // until something forces a real repaint. Nudging a single element's own
+    // opacity wasn't reliable enough (still reproduced with real taps), and
+    // a scroll nudge is a no-op on a page with nothing to scroll (About,
+    // Contact - exactly where this also showed up). Toggling display on the
+    // whole page forces a full reflow+repaint unconditionally, regardless
+    // of scroll state; a route change already swaps all the content in the
+    // same instant, so one more frame of nothing painted right then is not
+    // a new gap, just a slightly longer version of the one already there.
+    Promise.all(swaps).then(()=>{
+      const prevDisplay = document.body.style.display;
+      document.body.style.display = 'none';
+      void document.body.offsetHeight;
+      document.body.style.display = prevDisplay;
     });
   });
 }
