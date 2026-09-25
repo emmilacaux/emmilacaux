@@ -127,22 +127,22 @@ img,svg{ max-width:100%; display:block; }
 .page-simple .contact-link, .link{
   filter: blur(.6px) contrast(200%);
 }
-/* Live CSS `filter: blur()` on text is unusable on phone screens — proven
-   across dozens of tested magnitudes (from .0001px to 1.3px) and contrast
-   values: it always renders as a hard blob, never the grain seen here on
-   desktop. So on narrow viewports the live filter is off, and a script
-   (bottom of page, see rasterizeMobileText) bakes the equivalent texture
-   into a Canvas-2D-rendered bitmap per text element instead — manual
-   pixel math (blur+contrast on the alpha channel), not the browser's own
-   filter or ctx.filter (also unreliable on real Safari). Chosen after
-   on-device comparison at mobile-canvas-test.html: variant "N3". */
+/* The plain CSS `filter: blur()` shorthand above is unusable on phone
+   screens — proven across dozens of tested magnitudes and contrast
+   values, it always renders as a hard blob, never the grain seen here on
+   desktop, in every mobile browser tried. An SVG filter (feGaussianBlur),
+   applied via filter:url(#id) instead of the blur() shorthand, goes
+   through a different rendering path and does render correctly on real
+   mobile browsers - confirmed on-device at mobile-text-test.html, variant
+   "SVG-F". See the <svg><defs> near the top of <body> for the filter
+   itself. */
 @media (max-width:760px){
   .photo-caption, .fragment, .label-inline, .counter, .meta,
   .nextprev a, .site-footer, .project-head .title, .index-item,
   .index-head, .page-simple h1:not(.brand-name), .page-simple p,
   .page-simple .field-label, .page-simple .field-value,
   .page-simple .contact-link, .link{
-    filter: none;
+    filter: url(#mobileTextBlur);
   }
 }
 a{ color:inherit; text-decoration:none; }
@@ -256,7 +256,7 @@ header.site .brand{
   filter: blur(.375px) contrast(145%);
 }
 @media (max-width:760px){
-  header.site .brand{ filter: none; }
+  header.site .brand{ filter: url(#mobileBrandBlur); }
 }
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
@@ -460,6 +460,21 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
 </head>
 <body>
 
+<!-- Mobile text effect: SVG feGaussianBlur, applied via filter:url(#id) in
+     the mobile media queries above (CSS `filter: blur()` proved unusable
+     on real phone screens; this different rendering path isn't). Picked
+     on-device at mobile-text-test.html, variant "SVG-F" (blur only, no
+     added contrast stage). The brand name gets a lighter dose, same 0.6/
+     0.375 ratio as the desktop blur(.6px)/blur(.375px) pair, so it stays
+     the cleanest thing on the page there too. Zero size + absolute
+     position so it never affects layout; it's referenced, never shown. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="mobileTextBlur"><feGaussianBlur stdDeviation="0.6"/></filter>
+    <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
+  </defs>
+</svg>
+
 <header class="site">
   <a class="brand" href="#/">Emmi Lacaux</a>
   <nav id="nav"></nav>
@@ -553,15 +568,6 @@ function photoDiv({ratio='r-3-2', scale='sc-m', align='left', caption, src, alt=
     img.src = src;
     img.alt = alt || '';
     img.loading = 'eager';
-    // No explicit width/height on these (they render at their own natural
-    // ratio, portrait or landscape), so each one goes from 0 height to its
-    // real height the moment it loads - shifting everything below it
-    // downward. On mobile that left already-rasterized text sitting at its
-    // old (pre-shift) position for a beat: it'd disappear when the next
-    // pass cleared it and reappear once repositioned, reading as a flicker.
-    // Re-rasterizing on every image load keeps text glued to the real
-    // layout as it settles instead of catching up on a fixed delay.
-    img.addEventListener('load', rasterizeMobileText);
     p.appendChild(img);
   } else {
     p.className = `photo ${ratio}`; // neutral box only, no gradient — "image will be here"
@@ -632,7 +638,6 @@ function appendFooter(app, opts={}){
     if(opts.noTop){
       const msg = f.querySelector('.no-top-msg');
       msg.hidden = false;
-      if (isMobileView()) rasterizeOne(msg);
       clearTimeout(noTopTimer);
       noTopTimer = setTimeout(()=>{ msg.hidden = true; }, 2200);
     } else {
@@ -783,324 +788,22 @@ function renderContact(){
   setupCounter(null);
 }
 
-/* ---------------------------- mobile text rasterization ----------------------------
-   Live CSS `filter: blur()` is unusable on phone screens (see the CSS
-   comment above the mobile @media block) — always a hard blob, in every
-   mobile browser, at every magnitude tried. This bakes the equivalent
-   texture into a Canvas-2D bitmap per text element instead, using manual
-   pixel math (not the browser's blur, not ctx.filter — also unreliable on
-   real Safari): a 3-pass box blur on the alpha channel approximates a
-   Gaussian (smoother falloff than one big box blur, so tight letter
-   counters like the eye of an "e" don't bridge shut), then a contrast
-   curve on that same alpha hardens the edge. Parameters ("N3") were
-   picked by eye on a real phone at mobile-canvas-test.html. The bitmap is
-   shown via a separate absolutely-positioned <img> overlaid exactly on
-   top of the now-transparent-inked real text (not a background-image on
-   the element itself — that forced choosing between clipping the blur's
-   fade at one edge or nudging the element's own box, which has zero
-   spare pixels in a tight nav/index/footer row). The overlay can bleed a
-   few px past the text's box on every side with no layout effect at all,
-   since it's out of flow; the real text underneath still carries the
-   click targets and accessibility. Runs only on narrow (mobile)
-   viewports; desktop keeps the plain live CSS filter, unaffected. */
-const MOBILE_TEXT_SELECTOR = '.photo-caption, .fragment, .label-inline, .counter, ' +
-  '.meta span, .site-footer .archive-date, .no-top-msg, .project-head .title, ' +
-  '.index-item .no, .index-item .cat, .index-item .yr, .index-head, ' +
-  '.page-simple h1:not(.brand-name), .page-simple p, .page-simple .field-label, ' +
-  '.page-simple .field-value, .link, header.site .brand';
-
-function isMobileView(){ return window.matchMedia('(max-width:760px)').matches; }
-
-// Element -> its overlay <img>. The overlay (not a background-image on the
-// element itself) is what lets the blurred bitmap bleed a couple pixels
-// past the element's own box for the blur to fade into, on every side,
-// without changing that element's width/height/display at all — no risk
-// of nudging a tight nav/index/footer layout that has zero pixels to
-// spare, which is exactly what background-image-on-the-element did.
-const rasterOverlays = new Map();
-
-function clearRasterizedText(){
-  rasterOverlays.forEach(img => img.remove());
-  rasterOverlays.clear();
-  document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
-    el.style.removeProperty('color');
-    el.style.removeProperty('-webkit-text-fill-color');
-    el.style.removeProperty('background-image');
-    el.style.removeProperty('background-size');
-    el.style.removeProperty('background-repeat');
-    el.style.removeProperty('background-position');
-    el.style.removeProperty('display');
-    el.style.removeProperty('width');
-    el.style.removeProperty('height');
-  });
-}
-
-// Fractional-radius box blur on the alpha channel (the ink itself is a
-// flat fill color; only the anti-aliased edge *coverage* varies).
-function boxBlurAlpha(imageData, radius){
-  if (radius <= 0) return;
-  const { data, width, height } = imageData;
-  const r = Math.floor(radius);
-  const frac = radius - r;
-  const tmp = new Float32Array(width * height);
-  for (let y = 0; y < height; y++){
-    for (let x = 0; x < width; x++){
-      let sum = 0, weight = 0;
-      for (let dx = -r; dx <= r; dx++){
-        const nx = x + dx;
-        if (nx >= 0 && nx < width){ sum += data[(y * width + nx) * 4 + 3]; weight += 1; }
-      }
-      if (frac > 0){
-        const lx = x - r - 1, rx = x + r + 1;
-        if (lx >= 0){ sum += data[(y * width + lx) * 4 + 3] * frac; weight += frac; }
-        if (rx < width){ sum += data[(y * width + rx) * 4 + 3] * frac; weight += frac; }
-      }
-      tmp[y * width + x] = sum / weight;
-    }
-  }
-  for (let x = 0; x < width; x++){
-    for (let y = 0; y < height; y++){
-      let sum = 0, weight = 0;
-      for (let dy = -r; dy <= r; dy++){
-        const ny = y + dy;
-        if (ny >= 0 && ny < height){ sum += tmp[ny * width + x]; weight += 1; }
-      }
-      if (frac > 0){
-        const ly = y - r - 1, ry = y + r + 1;
-        if (ly >= 0){ sum += tmp[ly * width + x] * frac; weight += frac; }
-        if (ry < height){ sum += tmp[ry * width + x] * frac; weight += frac; }
-      }
-      data[(y * width + x) * 4 + 3] = Math.round(sum / weight);
-    }
-  }
-}
-// 3 passes of a small box blur approximate a Gaussian — energy concentrates
-// near the center and tapers off, instead of spreading dead-evenly across
-// the whole radius the way one big box blur pass does.
-function gaussianApproxAlpha(imageData, radiusPerPass, passes){
-  for (let i = 0; i < passes; i++) boxBlurAlpha(imageData, radiusPerPass);
-}
-function contrastAlpha(imageData, contrastPct){
-  const factor = contrastPct / 100;
-  const { data } = imageData;
-  for (let i = 3; i < data.length; i += 4){
-    const a = (data[i] / 255 - 0.5) * factor + 0.5;
-    data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
-  }
-}
-
-function wrapCanvasText(ctx, text, maxWidth){
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines = [];
-  let line = '';
-  words.forEach(word=>{
-    const test = line ? line + ' ' + word : word;
-    if (line && ctx.measureText(test).width > maxWidth) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  });
-  if (line) lines.push(line);
-  return lines;
-}
-
-function rasterizeOne(el, retry){
-  const text = (el.textContent || '').trim();
-  if (!text) return;
-  const rect = el.getBoundingClientRect();
-  const width = Math.ceil(rect.width);
-  if (!width) return;
-
-  const cs = getComputedStyle(el);
-  // "Emmi Lacaux" gets a lighter dose than body text, same relationship
-  // as its desktop filter (blur(.375px)/contrast(145%) vs body's
-  // blur(.6px)/contrast(200%)) — the name stays the cleanest thing here too.
-  const isBrand = el.matches('header.site .brand');
-  // Everything in header.site (brand + nav links) is position:fixed and
-  // never moves with document scroll - its overlay has to be fixed too,
-  // not absolute-with-scrollY, or it drifts away the moment the page scrolls.
-  const isFixed = !!el.closest('header.site');
-  const radiusPerPass = 0.45;
-  const contrastPct = isBrand ? 118 : 130;
-  // The blur needs a little room on every side to fade out instead of
-  // hitting a hard wall right at the canvas edge (which reads as a
-  // pixelated/cut-off border). That room comes from the *overlay* image
-  // being pad px bigger than the element on each side (see below) — never
-  // from resizing the element itself, which has zero spare pixels in a
-  // tight nav/index/footer row and would just clip on the opposite edge.
-  const pad = 3;
-
-  const fontSize = parseFloat(cs.fontSize) || 14;
-  let lineHeight = parseFloat(cs.lineHeight);
-  if (!lineHeight || isNaN(lineHeight)) lineHeight = fontSize * 1.3;
-  const textAlign = cs.textAlign === 'start' ? 'left' : cs.textAlign;
-  const font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
-  // Canvas ignores letter-spacing unless told explicitly — without this,
-  // measured/drawn text is narrower than the real (letter-spaced) DOM box,
-  // so wrapping disagrees with the live layout (e.g. the project title,
-  // which sets letter-spacing:.02em).
-  const letterSpacing = cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '0px';
-
-  // Some elements (e.g. .index-head) carry their own horizontal padding
-  // rather than relying on an ancestor's — rect.width is the border box,
-  // so wrapping/drawing against it directly ignores that inset and draws
-  // the text flush with the box's outer edge instead of where it actually
-  // sits, clipping it against whatever's to the left (the logo, in that case).
-  const paddingLeft = parseFloat(cs.paddingLeft) || 0;
-  const paddingRight = parseFloat(cs.paddingRight) || 0;
-  const contentWidth = Math.max(0, width - paddingLeft - paddingRight);
-
-  const measure = document.createElement('canvas').getContext('2d');
-  measure.font = font;
-  try { measure.letterSpacing = letterSpacing; } catch(e){}
-  const lines = wrapCanvasText(measure, text, contentWidth);
-  const textHeight = Math.ceil(lines.length * lineHeight);
-  if (!textHeight) return;
-
-  const overlayW = width + pad * 2;
-  const overlayH = textHeight + pad * 2;
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(overlayW * dpr);
-  canvas.height = Math.ceil(overlayH * dpr);
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  ctx.font = font;
-  try { ctx.letterSpacing = letterSpacing; } catch(e){}
-  ctx.fillStyle = cs.color;
-  ctx.textBaseline = 'top';
-  lines.forEach((line, i)=>{
-    const lineWidth = ctx.measureText(line).width;
-    let x = pad + paddingLeft;
-    if (textAlign === 'center') x = pad + paddingLeft + (contentWidth - lineWidth) / 2;
-    else if (textAlign === 'right') x = pad + paddingLeft + contentWidth - lineWidth;
-    ctx.fillText(line, x, i * lineHeight + pad);
-  });
-
-  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  gaussianApproxAlpha(imgData, radiusPerPass * dpr, 3);
-  contrastAlpha(imgData, contrastPct);
-  ctx.putImageData(imgData, 0, 0);
-
-  el.style.setProperty('color', 'transparent');
-  el.style.setProperty('-webkit-text-fill-color', 'transparent');
-
-  let img = rasterOverlays.get(el);
-  if (!img) {
-    img = document.createElement('img');
-    img.setAttribute('aria-hidden', 'true');
-    img.style.position = isFixed ? 'fixed' : 'absolute';
-    img.style.pointerEvents = 'none';
-    document.body.appendChild(img);
-    rasterOverlays.set(el, img);
-  }
-  if (isFixed) {
-    img.style.left = `${rect.left - pad}px`;
-    img.style.top = `${rect.top - pad}px`;
-  } else {
-    img.style.left = `${rect.left + window.scrollX - pad}px`;
-    img.style.top = `${rect.top + window.scrollY - pad}px`;
-  }
-  img.style.width = `${overlayW}px`;
-  img.style.height = `${overlayH}px`;
-
-  // Swap the src only once the new bitmap is fully decoded, so a real
-  // device never paints a half-decoded frame of the overlay for a tick.
-  const dataUrl = canvas.toDataURL('image/png');
-  const pre = new Image();
-  pre.src = dataUrl;
-  const swapped = (pre.decode ? pre.decode().catch(()=>{}) : Promise.resolve())
-    .then(()=>{ img.src = dataUrl; });
-
-  // Real devices can still be mid-layout-shift (late webfont swap, a photo
-  // above this element loading in and pushing things around) at the exact
-  // moment this ran, especially right after a route change. If the box's
-  // width changed since we measured it, the overlay no longer lines up —
-  // measure again and redo it once, rather than leave a stale/misplaced
-  // one up.
-  if (!retry) {
-    const rectNow = el.getBoundingClientRect();
-    if (Math.abs(Math.ceil(rectNow.width) - width) > 1 || Math.abs(rectNow.top - rect.top) > 1) {
-      return rasterizeOne(el, true);
-    }
-  }
-  return swapped;
-}
-
-let rasterizeScheduled = false;
-let rasterizeScheduledPromise = null;
-function rasterizeMobileText(){
-  if (rasterizeScheduled) return rasterizeScheduledPromise;
-  rasterizeScheduled = true;
-  rasterizeScheduledPromise = new Promise(resolveOuter=>{
-    requestAnimationFrame(()=>{
-      rasterizeScheduled = false;
-      clearRasterizedText();
-      if (!isMobileView()) { resolveOuter(); return; }
-      // On a cold load the custom fonts can still be fetching. Measuring/
-      // drawing against the fallback font in that window produces overlays
-      // sized and wrapped for a different font than the one the real (now
-      // hidden) text will render in a moment later - close enough to still
-      // look plausible-but-wrong rather than obviously broken, which is
-      // worse. Leave the real text plain and readable instead, and let the
-      // document.fonts.ready listener below run the real pass once the
-      // right font is actually in.
-      if (document.fonts.status !== 'loaded') { document.fonts.ready.then(rasterizeMobileText).then(resolveOuter); return; }
-      const swaps = [];
-      document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
-        if (el.hidden || el.offsetParent === null) return; // skip hidden (e.g. .no-top-msg before its first click)
-        swaps.push(rasterizeOne(el));
-      });
-      // Mobile Chrome and Safari can both leave a freshly (re)painted overlay
-      // out of the composited frame - every property checks out (decoded,
-      // correct size/position, opacity settled) but it's simply never drawn
-      // until something forces a real repaint. Tried, in order: nudging one
-      // overlay's opacity, nudging the whole body's opacity, nudging each
-      // overlay's own width, nudging the whole body's width - none held up
-      // under a real tap, all still reproduced missing text. Only
-      // display:none on the whole page ever did, reliably, every time - but
-      // it visibly flashes. What's actually different about display:none
-      // isn't "layout" vs "compositing", it's that it fully tears down and
-      // recreates the render/compositor object for everything inside it,
-      // forcing a fresh image decode and a fresh GPU upload - the thing an
-      // in-place style nudge never touches, no matter which property. Do
-      // that same teardown-and-rebuild, but scoped to just the overlay
-      // <img> elements themselves (remove then immediately re-append, same
-      // tick, nothing async in between) instead of the entire page - same
-      // mechanism display:none relied on, without hiding anything else.
-      Promise.all(swaps).then(()=>{
-        rasterOverlays.forEach(img=>{
-          const parent = img.parentNode;
-          if (!parent) return;
-          parent.removeChild(img);
-          parent.appendChild(img);
-        });
-        resolveOuter();
-      });
-    });
-  });
-  return rasterizeScheduledPromise;
-}
-
-let mobileTextResizeTimer;
-let lastInnerWidth = window.innerWidth;
-window.addEventListener('resize', ()=>{
-  // iOS Safari fires 'resize' repeatedly while its address bar collapses
-  // and expands during ordinary scrolling - including on pages with
-  // nothing to scroll. A full rasterizeMobileText() tears down every
-  // overlay and rebuilds them one by one as each bitmap decodes, so
-  // reacting to every one of those height-only blips made text flicker
-  // out and stagger back in mid-scroll. Only redo the actual rendering
-  // when the width changed (rotation, real resize) - a height-only change
-  // can't affect any of these elements' wrap or position.
-  if (window.innerWidth === lastInnerWidth) return;
-  lastInnerWidth = window.innerWidth;
-  clearTimeout(mobileTextResizeTimer);
-  mobileTextResizeTimer = setTimeout(rasterizeMobileText, 200);
-});
-document.fonts.ready.then(rasterizeMobileText);
+/* ---------------------------- mobile text effect ----------------------------
+   Used to be a Canvas-rasterized bitmap overlay, JS-positioned in sync
+   with the real (hidden) text on every scroll/resize/route change/image
+   load - CSS filter:blur() alone was unusable on real phone screens (a
+   hard blob at every magnitude tried, in every mobile browser). That
+   overlay approach worked but meant reimplementing, by hand, everything
+   the browser already does for free for real text: track scroll, track
+   resize, survive route changes, repaint reliably. Every one of those
+   was a fresh bug. Replaced with an SVG filter (feGaussianBlur, no
+   contrast stage) applied straight to the real, live text via CSS
+   `filter: url(#id)` - a different rendering path than the plain CSS
+   `blur()` shorthand, and one that (confirmed on-device at
+   mobile-text-test.html, variant SVG-F) actually renders correctly on
+   real mobile browsers. The text is real again: the browser positions it,
+   same as it always has, same as desktop. See the SVG <defs> near the top
+   of <body> for the actual filters. */
 
 /* ---------------------------- router ---------------------------- */
 
@@ -1149,27 +852,9 @@ function route(){
     if (++scrollLockFrames < 12) requestAnimationFrame(holdScrollTop);
   })();
 
-  // rasterizeMobileText's own repaint fix (a whole-page display toggle,
-  // done once every overlay in the pass has actually swapped in) can land
-  // well after the holdScrollTop burst above has already finished, and
-  // toggling display is itself one more thing that can nudge scroll
-  // position. Chain one more scroll-to-top onto its completion - only
-  // here, never inside rasterizeMobileText itself, since that function
-  // also runs on a plain image load elsewhere on the page (to keep text
-  // glued to a shifting layout), where forcing scroll-to-top would yank
-  // someone back to the top while they're just scrolling through photos.
-  // Deferred by a frame rather than chained immediately: calling
-  // scrollTo() in the very same tick as the display-toggle repaint fix
-  // above (even as a scrollY 0 -> 0 no-op) risked the browser coalescing
-  // the two together and skipping the paint it was just forced to do.
-  rasterizeMobileText().then(()=>requestAnimationFrame(()=>window.scrollTo(0,0)));
-  // A second pass shortly after: catches layout that's still settling on a
-  // real device right after navigation (late webfont swap, images above
-  // this text loading in and shifting it) that the immediate pass can miss.
-  setTimeout(()=>{
-    window.scrollTo(0,0);
-    rasterizeMobileText().then(()=>requestAnimationFrame(()=>window.scrollTo(0,0)));
-  }, 350);
+  // A second pass shortly after: catches a scroll position that's still
+  // settling on a real device right after navigation.
+  setTimeout(()=>{ window.scrollTo(0,0); }, 350);
 }
 
 // Leave scroll position entirely to route()'s own scroll-to-top - the
@@ -1200,13 +885,11 @@ function setupCounter(total){
   if(!total){ el.textContent = ''; return; }
   const imgs = Array.from(document.querySelectorAll('[data-is-image="1"]'));
   el.textContent = `01 / ${String(total).padStart(2,'0')}`;
-  if (isMobileView()) rasterizeOne(el);
   counterObserver = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{
       if(e.isIntersecting){
         const i = imgs.indexOf(e.target) + 1;
         if(i > 0) el.textContent = `${String(i).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
-        if (isMobileView()) rasterizeOne(el);
       }
     });
   }, { threshold: 0.5 });
