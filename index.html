@@ -1056,21 +1056,27 @@ function rasterizeMobileText(){
       // Mobile Chrome and Safari can both leave a freshly (re)painted overlay
       // out of the composited frame - every property checks out (decoded,
       // correct size/position, opacity settled) but it's simply never drawn
-      // until something forces a real repaint. Tried nudging opacity instead
-      // of this (on one overlay, then on the whole body) hoping for the same
-      // fix without a visible flash - neither held up under a real tap,
-      // reproduced missing text again both times. Opacity is a compositing-
-      // stage change; it can't force a re-paint of content that was never
-      // correctly rasterized into the layer in the first place, which is
-      // the actual bug. display:none briefly removing the page from the
-      // render tree and back is the only thing that's actually held up
-      // under repeated real testing - a working page with a brief flash
-      // beats a broken one, so keep it, even though it's not free.
+      // until something forces a real repaint. Tried, in order: nudging one
+      // overlay's opacity, nudging the whole body's opacity, nudging each
+      // overlay's own width, nudging the whole body's width - none held up
+      // under a real tap, all still reproduced missing text. Only
+      // display:none on the whole page ever did, reliably, every time - but
+      // it visibly flashes. What's actually different about display:none
+      // isn't "layout" vs "compositing", it's that it fully tears down and
+      // recreates the render/compositor object for everything inside it,
+      // forcing a fresh image decode and a fresh GPU upload - the thing an
+      // in-place style nudge never touches, no matter which property. Do
+      // that same teardown-and-rebuild, but scoped to just the overlay
+      // <img> elements themselves (remove then immediately re-append, same
+      // tick, nothing async in between) instead of the entire page - same
+      // mechanism display:none relied on, without hiding anything else.
       Promise.all(swaps).then(()=>{
-        const prevDisplay = document.body.style.display;
-        document.body.style.display = 'none';
-        void document.body.offsetHeight;
-        document.body.style.display = prevDisplay;
+        rasterOverlays.forEach(img=>{
+          const parent = img.parentNode;
+          if (!parent) return;
+          parent.removeChild(img);
+          parent.appendChild(img);
+        });
         resolveOuter();
       });
     });
