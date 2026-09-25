@@ -845,6 +845,10 @@ function rasterizeOne(el, retry){
   // as its desktop filter (blur(.375px)/contrast(145%) vs body's
   // blur(.6px)/contrast(200%)) — the name stays the cleanest thing here too.
   const isBrand = el.matches('header.site .brand');
+  // Everything in header.site (brand + nav links) is position:fixed and
+  // never moves with document scroll - its overlay has to be fixed too,
+  // not absolute-with-scrollY, or it drifts away the moment the page scrolls.
+  const isFixed = !!el.closest('header.site');
   const radiusPerPass = 0.45;
   const contrastPct = isBrand ? 118 : 130;
   // The blur needs a little room on every side to fade out instead of
@@ -914,13 +918,18 @@ function rasterizeOne(el, retry){
   if (!img) {
     img = document.createElement('img');
     img.setAttribute('aria-hidden', 'true');
-    img.style.position = 'absolute';
+    img.style.position = isFixed ? 'fixed' : 'absolute';
     img.style.pointerEvents = 'none';
     document.body.appendChild(img);
     rasterOverlays.set(el, img);
   }
-  img.style.left = `${rect.left + window.scrollX - pad}px`;
-  img.style.top = `${rect.top + window.scrollY - pad}px`;
+  if (isFixed) {
+    img.style.left = `${rect.left - pad}px`;
+    img.style.top = `${rect.top - pad}px`;
+  } else {
+    img.style.left = `${rect.left + window.scrollX - pad}px`;
+    img.style.top = `${rect.top + window.scrollY - pad}px`;
+  }
   img.style.width = `${overlayW}px`;
   img.style.height = `${overlayH}px`;
 
@@ -965,7 +974,18 @@ function rasterizeMobileText(){
 }
 
 let mobileTextResizeTimer;
+let lastInnerWidth = window.innerWidth;
 window.addEventListener('resize', ()=>{
+  // iOS Safari fires 'resize' repeatedly while its address bar collapses
+  // and expands during ordinary scrolling - including on pages with
+  // nothing to scroll. A full rasterizeMobileText() tears down every
+  // overlay and rebuilds them one by one as each bitmap decodes, so
+  // reacting to every one of those height-only blips made text flicker
+  // out and stagger back in mid-scroll. Only redo the actual rendering
+  // when the width changed (rotation, real resize) - a height-only change
+  // can't affect any of these elements' wrap or position.
+  if (window.innerWidth === lastInnerWidth) return;
+  lastInnerWidth = window.innerWidth;
   clearTimeout(mobileTextResizeTimer);
   mobileTextResizeTimer = setTimeout(rasterizeMobileText, 200);
 });
