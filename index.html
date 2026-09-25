@@ -129,19 +129,19 @@ img,svg{ max-width:100%; display:block; }
    screens — a hard blob, never the grain seen here on desktop, in every
    mobile browser tried. An SVG filter (feGaussianBlur) renders correctly
    there instead - confirmed on-device at mobile-text-test.html, variant
-   "SVG-F". A real <svg><defs> element holding that filter kept painting a
-   stray black mark on real Safari no matter how it was hidden, though, so
-   this reaches the same filter a different way: the whole SVG document is
-   inlined as a data: URI directly inside `url()`, with nothing added to
-   the page at all - no element for Safari to mis-render in the first
-   place. */
+   "SVG-F". Tried referencing it as a data: URI with no <svg> element on
+   the page at all, to sidestep the black-mark issue below - but Safari
+   silently doesn't apply a filter referenced that way at all (no effect,
+   no error), so back to a real inline <svg><defs> element, which is what
+   the working on-device test actually used. See that <svg> near the top
+   of <body>. */
 @media (max-width:760px){
   .photo-caption, .fragment, .label-inline, .counter, .meta,
   .nextprev a, .site-footer, .project-head .title, .index-item,
   .index-head, .page-simple h1:not(.brand-name), .page-simple p,
   .page-simple .field-label, .page-simple .field-value,
   .page-simple .contact-link, .link{
-    filter: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22b%22%3E%3CfeGaussianBlur stdDeviation=%220.6%22/%3E%3C/filter%3E%3C/svg%3E#b');
+    filter: url(#mobileTextBlur);
   }
 }
 a{ color:inherit; text-decoration:none; }
@@ -226,7 +226,7 @@ header.site .brand{
   filter: blur(.375px) contrast(145%);
 }
 @media (max-width:760px){
-  header.site .brand{ filter: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22b%22%3E%3CfeGaussianBlur stdDeviation=%220.375%22/%3E%3C/filter%3E%3C/svg%3E#b'); }
+  header.site .brand{ filter: url(#mobileBrandBlur); }
 }
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
@@ -405,6 +405,22 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
 </style>
 </head>
 <body>
+
+<!-- Mobile text effect: SVG feGaussianBlur, applied via filter:url(#id) in
+     the mobile media queries above. CSS `filter: blur()` proved unusable
+     on real phone screens, and a data:-URI reference to this same filter
+     (no element on the page at all) turned out to just silently not apply
+     on Safari - it has to be a real element in this document. Parked at
+     position:fixed, thousands of pixels outside the viewport in both
+     directions, since a merely 0-sized+hidden version of this element
+     still painted a small stray mark on real Safari; wherever it actually
+     gets painted now, it's nowhere anyone will ever see. -->
+<svg width="1" height="1" style="position:fixed; top:-9999px; left:-9999px; overflow:hidden;" aria-hidden="true">
+  <defs>
+    <filter id="mobileTextBlur"><feGaussianBlur stdDeviation="0.6"/></filter>
+    <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
+  </defs>
+</svg>
 
 <header class="site">
   <a class="brand" href="#/">Emmi Lacaux</a>
