@@ -220,6 +220,17 @@ html{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--bg); }
     text-decoration-color:var(--red);
   }
 }
+/* :active is the touch equivalent - it only applies while the finger is
+   actually down and releases the instant it lifts (unlike :hover, it was
+   never the thing getting stuck), so it needs no (hover:hover) guard. This
+   is what gives a tap on mobile the same red+underline flash a mouse hover
+   gives on desktop, without ever risking it staying on afterward. */
+.link:active,
+.link.active:active{
+  color:var(--red);
+  text-decoration:underline;
+  text-decoration-color:var(--red);
+}
 
 /* ---------------- header / nav ---------------- */
 header.site{
@@ -258,6 +269,12 @@ header.site .brand{
     text-decoration-thickness:1px;
   }
 }
+.not-home header.site .brand:active{
+  text-decoration:underline;
+  text-decoration-color:var(--red);
+  text-underline-offset:3px;
+  text-decoration-thickness:1px;
+}
 header.site nav{ display:flex; gap: 22px; }
 header.site nav a{ font-size:.8rem; }
 
@@ -274,6 +291,15 @@ header.site nav a{ font-size:.8rem; }
    real, current viewport instead; the plain vh rule stays first as a
    fallback for browsers that don't support dvh. */
 #app{ min-height:100vh; min-height:100dvh; padding-top:64px; padding-bottom:14vh; }
+/* That 14vh is deliberate breathing room after the footer, part of the
+   desktop design language - kept as-is there. On mobile it's exactly the
+   extra scrollable emptiness the user asked to get rid of: real, physical
+   padding still counts toward the page's scrollable height no matter what
+   min-height says, dvh or not. Dropping it there (mobile only, desktop
+   untouched) removes that room instead of just resizing it. */
+@media (max-width:760px){
+  #app{ padding-bottom:0; }
+}
 .field{ position:relative; width:100%; padding: 0 var(--gutter); }
 
 .pause-xs{ height: clamp(28px, 5vh, 56px); }
@@ -1004,45 +1030,50 @@ function rasterizeOne(el, retry){
 }
 
 let rasterizeScheduled = false;
+let rasterizeScheduledPromise = null;
 function rasterizeMobileText(){
-  if (rasterizeScheduled) return;
+  if (rasterizeScheduled) return rasterizeScheduledPromise;
   rasterizeScheduled = true;
-  requestAnimationFrame(()=>{
-    rasterizeScheduled = false;
-    clearRasterizedText();
-    if (!isMobileView()) return;
-    // On a cold load the custom fonts can still be fetching. Measuring/
-    // drawing against the fallback font in that window produces overlays
-    // sized and wrapped for a different font than the one the real (now
-    // hidden) text will render in a moment later - close enough to still
-    // look plausible-but-wrong rather than obviously broken, which is
-    // worse. Leave the real text plain and readable instead, and let the
-    // document.fonts.ready listener below run the real pass once the
-    // right font is actually in.
-    if (document.fonts.status !== 'loaded') { document.fonts.ready.then(rasterizeMobileText); return; }
-    const swaps = [];
-    document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
-      if (el.hidden || el.offsetParent === null) return; // skip hidden (e.g. .no-top-msg before its first click)
-      swaps.push(rasterizeOne(el));
-    });
-    // Mobile Chrome and Safari can both leave a freshly (re)painted overlay
-    // out of the composited frame - every property checks out (decoded,
-    // correct size/position, opacity settled) but it's simply never drawn
-    // until something forces a real repaint. Nudging a single element's own
-    // opacity wasn't reliable enough (still reproduced with real taps), and
-    // a scroll nudge is a no-op on a page with nothing to scroll (About,
-    // Contact - exactly where this also showed up). Toggling display on the
-    // whole page forces a full reflow+repaint unconditionally, regardless
-    // of scroll state; a route change already swaps all the content in the
-    // same instant, so one more frame of nothing painted right then is not
-    // a new gap, just a slightly longer version of the one already there.
-    Promise.all(swaps).then(()=>{
-      const prevDisplay = document.body.style.display;
-      document.body.style.display = 'none';
-      void document.body.offsetHeight;
-      document.body.style.display = prevDisplay;
+  rasterizeScheduledPromise = new Promise(resolveOuter=>{
+    requestAnimationFrame(()=>{
+      rasterizeScheduled = false;
+      clearRasterizedText();
+      if (!isMobileView()) { resolveOuter(); return; }
+      // On a cold load the custom fonts can still be fetching. Measuring/
+      // drawing against the fallback font in that window produces overlays
+      // sized and wrapped for a different font than the one the real (now
+      // hidden) text will render in a moment later - close enough to still
+      // look plausible-but-wrong rather than obviously broken, which is
+      // worse. Leave the real text plain and readable instead, and let the
+      // document.fonts.ready listener below run the real pass once the
+      // right font is actually in.
+      if (document.fonts.status !== 'loaded') { document.fonts.ready.then(rasterizeMobileText).then(resolveOuter); return; }
+      const swaps = [];
+      document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
+        if (el.hidden || el.offsetParent === null) return; // skip hidden (e.g. .no-top-msg before its first click)
+        swaps.push(rasterizeOne(el));
+      });
+      // Mobile Chrome and Safari can both leave a freshly (re)painted overlay
+      // out of the composited frame - every property checks out (decoded,
+      // correct size/position, opacity settled) but it's simply never drawn
+      // until something forces a real repaint. Nudging a single element's own
+      // opacity wasn't reliable enough (still reproduced with real taps), and
+      // a scroll nudge is a no-op on a page with nothing to scroll (About,
+      // Contact - exactly where this also showed up). Toggling display on the
+      // whole page forces a full reflow+repaint unconditionally, regardless
+      // of scroll state; a route change already swaps all the content in the
+      // same instant, so one more frame of nothing painted right then is not
+      // a new gap, just a slightly longer version of the one already there.
+      Promise.all(swaps).then(()=>{
+        const prevDisplay = document.body.style.display;
+        document.body.style.display = 'none';
+        void document.body.offsetHeight;
+        document.body.style.display = prevDisplay;
+        resolveOuter();
+      });
     });
   });
+  return rasterizeScheduledPromise;
 }
 
 let mobileTextResizeTimer;
@@ -1110,11 +1141,27 @@ function route(){
     if (++scrollLockFrames < 12) requestAnimationFrame(holdScrollTop);
   })();
 
-  rasterizeMobileText();
+  // rasterizeMobileText's own repaint fix (a whole-page display toggle,
+  // done once every overlay in the pass has actually swapped in) can land
+  // well after the holdScrollTop burst above has already finished, and
+  // toggling display is itself one more thing that can nudge scroll
+  // position. Chain one more scroll-to-top onto its completion - only
+  // here, never inside rasterizeMobileText itself, since that function
+  // also runs on a plain image load elsewhere on the page (to keep text
+  // glued to a shifting layout), where forcing scroll-to-top would yank
+  // someone back to the top while they're just scrolling through photos.
+  // Deferred by a frame rather than chained immediately: calling
+  // scrollTo() in the very same tick as the display-toggle repaint fix
+  // above (even as a scrollY 0 -> 0 no-op) risked the browser coalescing
+  // the two together and skipping the paint it was just forced to do.
+  rasterizeMobileText().then(()=>requestAnimationFrame(()=>window.scrollTo(0,0)));
   // A second pass shortly after: catches layout that's still settling on a
   // real device right after navigation (late webfont swap, images above
   // this text loading in and shifting it) that the immediate pass can miss.
-  setTimeout(()=>{ window.scrollTo(0,0); rasterizeMobileText(); }, 350);
+  setTimeout(()=>{
+    window.scrollTo(0,0);
+    rasterizeMobileText().then(()=>requestAnimationFrame(()=>window.scrollTo(0,0)));
+  }, 350);
 }
 
 // Leave scroll position entirely to route()'s own scroll-to-top - the
