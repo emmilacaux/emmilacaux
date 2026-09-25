@@ -95,6 +95,13 @@ html,body{ margin:0; padding:0; }
    above the fold gradually - scroll anchoring's "helpful" scroll-position
    correction just fights the deliberate scroll-to-top on navigation. */
 html{ overflow-anchor:none; }
+/* No rubber-band bounce past the top or bottom edge - on a page short
+   enough to not scroll at all (About, Contact) there's nothing beyond
+   either edge to justify it, and the bounce-and-settle animation was
+   very likely part of why a route change could still end up not quite
+   at scrollY 0: the browser's own overscroll rebound fighting the
+   scroll-to-top after it already ran. */
+html, body{ overscroll-behavior-y: none; }
 body{
   background:var(--bg);
   color:var(--ink);
@@ -1102,6 +1109,12 @@ function route(){
   // this text loading in and shifting it) that the immediate pass can miss.
   setTimeout(()=>{ window.scrollTo(0,0); rasterizeMobileText(); }, 350);
 }
+
+// Leave scroll position entirely to route()'s own scroll-to-top - the
+// browser's default auto-restoration (meant for real back/forward
+// navigation) has no reason to be involved in an SPA's hash changes and
+// was one more thing that could fight the reset.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 window.addEventListener('hashchange', route);
 window.addEventListener('DOMContentLoaded', route);
