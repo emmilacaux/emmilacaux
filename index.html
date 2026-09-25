@@ -942,10 +942,19 @@ function rasterizeOne(el, retry){
   const dataUrl = canvas.toDataURL('image/png');
   const pre = new Image();
   pre.src = dataUrl;
+  // Both mobile Chrome and Safari can leave a freshly (re)painted overlay
+  // out of the composited frame after a route change - the element is
+  // correctly sized/positioned/decoded (verified), it's just never
+  // actually drawn until *something* forces a repaint, which is why it
+  // looked fixed by "nothing" (a later unrelated scroll/resize). Force
+  // that repaint ourselves right after each swap instead of hoping one
+  // happens to come along.
+  const forceRepaint = () => { void img.offsetHeight; };
   if (pre.decode) {
-    pre.decode().then(()=>{ img.src = dataUrl; }).catch(()=>{ img.src = dataUrl; });
+    pre.decode().then(()=>{ img.src = dataUrl; forceRepaint(); }).catch(()=>{ img.src = dataUrl; forceRepaint(); });
   } else {
     img.src = dataUrl;
+    forceRepaint();
   }
 
   // Real devices can still be mid-layout-shift (late webfont swap, a photo
@@ -1022,14 +1031,19 @@ function route(){
   // Scroll to top only after the new page's content has replaced the old -
   // doing it before let the browser's scroll anchoring "helpfully" shift
   // the position again once the DOM swap landed, so a route change from a
-  // scrolled-down page could land anywhere but the top.
+  // scrolled-down page could land anywhere but the top. Repeated on the
+  // next frame and again after the delayed rasterize pass below: a real
+  // device can still reflow after this point (late webfont swap, an image
+  // above the fold finishing its own layout) and shift the scroll position
+  // on its own even with anchoring off, so one call isn't enough to trust.
   window.scrollTo(0,0);
+  requestAnimationFrame(()=>window.scrollTo(0,0));
 
   rasterizeMobileText();
   // A second pass shortly after: catches layout that's still settling on a
   // real device right after navigation (late webfont swap, images above
   // this text loading in and shifting it) that the immediate pass can miss.
-  setTimeout(rasterizeMobileText, 350);
+  setTimeout(()=>{ window.scrollTo(0,0); rasterizeMobileText(); }, 350);
 }
 
 window.addEventListener('hashchange', route);
