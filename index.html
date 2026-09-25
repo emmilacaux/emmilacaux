@@ -95,6 +95,11 @@ html,body{ margin:0; padding:0; }
    above the fold gradually - scroll anchoring's "helpful" scroll-position
    correction just fights the deliberate scroll-to-top on navigation. */
 html{ overflow-anchor:none; }
+/* Rubber-band overscroll bounce-and-settle past the top edge is its own
+   animation, independent of JS, and can still be resolving after a route
+   change's scroll-to-top already ran - one more thing that could leave
+   the new page not quite at 0 after a fast swipe. */
+html, body{ overscroll-behavior-y: none; }
 body{
   background:var(--bg);
   color:var(--ink);
@@ -406,14 +411,16 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
      on-device at mobile-text-test.html, variant "SVG-F" (blur only, no
      added contrast stage). The brand name gets a lighter dose, same 0.6/
      0.375 ratio as the desktop blur(.6px)/blur(.375px) pair, so it stays
-     the cleanest thing on the page there too. Zero size + absolute
-     position so it never affects layout; it's referenced, never shown -
-     clip:rect(0,0,0,0) and overflow:hidden on top of that (the standard
-     "visually hidden" pattern) because a 0x0 SVG alone still rendered as
-     a small visible black mark in real Safari, scrolling with the page
-     content like anything else in normal flow, even though it reported
-     zero size in every test here. -->
-<svg width="0" height="0" style="position:absolute; overflow:hidden; clip:rect(0,0,0,0); clip-path:inset(50%);" aria-hidden="true">
+     the cleanest thing on the page there too. Never shown - just how
+     content-invisible varies by browser: 0x0 + position:absolute alone
+     still rendered as a small visible black mark in real Safari, and
+     adding overflow:hidden/clip/clip-path on top of that didn't fix it
+     either. Instead of trying to make it occupy zero space (something
+     Safari evidently still gives a stray pixel or two to regardless),
+     park it off in `position:fixed` real estate thousands of pixels
+     outside the viewport - wherever Safari decides to actually paint it,
+     it's nowhere anyone will ever see. -->
+<svg width="1" height="1" style="position:fixed; top:-9999px; left:-9999px; overflow:hidden;" aria-hidden="true">
   <defs>
     <filter id="mobileTextBlur"><feGaussianBlur stdDeviation="0.6"/></filter>
     <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
@@ -792,6 +799,12 @@ function route(){
     if (++scrollLockFrames < 10) requestAnimationFrame(holdScrollTop);
   })();
 }
+
+// The browser's own scroll auto-restoration is meant for real back/
+// forward navigation, not an SPA's hash changes - it has no reason to be
+// involved here at all, and was one more thing that could compete with
+// route()'s own scroll handling.
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
 window.addEventListener('hashchange', route);
 window.addEventListener('DOMContentLoaded', route);
