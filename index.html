@@ -721,9 +721,14 @@ function renderContact(){
    counters like the eye of an "e" don't bridge shut), then a contrast
    curve on that same alpha hardens the edge. Parameters ("N3") were
    picked by eye on a real phone at mobile-canvas-test.html. The bitmap is
-   painted as a background-image positioned over the now-transparent-inked
-   real text, so the text itself, its click targets and its accessibility
-   all stay exactly where they were. Runs only on narrow (mobile)
+   shown via a separate absolutely-positioned <img> overlaid exactly on
+   top of the now-transparent-inked real text (not a background-image on
+   the element itself — that forced choosing between clipping the blur's
+   fade at one edge or nudging the element's own box, which has zero
+   spare pixels in a tight nav/index/footer row). The overlay can bleed a
+   few px past the text's box on every side with no layout effect at all,
+   since it's out of flow; the real text underneath still carries the
+   click targets and accessibility. Runs only on narrow (mobile)
    viewports; desktop keeps the plain live CSS filter, unaffected. */
 const MOBILE_TEXT_SELECTOR = '.photo-caption, .fragment, .label-inline, .counter, ' +
   '.meta span, .site-footer .archive-date, .no-top-msg, .project-head .title, ' +
@@ -733,14 +738,24 @@ const MOBILE_TEXT_SELECTOR = '.photo-caption, .fragment, .label-inline, .counter
 
 function isMobileView(){ return window.matchMedia('(max-width:760px)').matches; }
 
+// Element -> its overlay <img>. The overlay (not a background-image on the
+// element itself) is what lets the blurred bitmap bleed a couple pixels
+// past the element's own box for the blur to fade into, on every side,
+// without changing that element's width/height/display at all — no risk
+// of nudging a tight nav/index/footer layout that has zero pixels to
+// spare, which is exactly what background-image-on-the-element did.
+const rasterOverlays = new Map();
+
 function clearRasterizedText(){
+  rasterOverlays.forEach(img => img.remove());
+  rasterOverlays.clear();
   document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
+    el.style.removeProperty('color');
+    el.style.removeProperty('-webkit-text-fill-color');
     el.style.removeProperty('background-image');
     el.style.removeProperty('background-size');
     el.style.removeProperty('background-repeat');
     el.style.removeProperty('background-position');
-    el.style.removeProperty('color');
-    el.style.removeProperty('-webkit-text-fill-color');
     el.style.removeProperty('display');
     el.style.removeProperty('width');
     el.style.removeProperty('height');
@@ -821,7 +836,8 @@ function wrapCanvasText(ctx, text, maxWidth){
 function rasterizeOne(el, retry){
   const text = (el.textContent || '').trim();
   if (!text) return;
-  const width = Math.ceil(el.getBoundingClientRect().width);
+  const rect = el.getBoundingClientRect();
+  const width = Math.ceil(rect.width);
   if (!width) return;
 
   const cs = getComputedStyle(el);
@@ -831,15 +847,13 @@ function rasterizeOne(el, retry){
   const isBrand = el.matches('header.site .brand');
   const radiusPerPass = 0.45;
   const contrastPct = isBrand ? 118 : 130;
-  // The blur needs a little room to fade out instead of hitting a hard
-  // wall right at the canvas edge (which reads as a pixelated/cut-off
-  // border). Wrapping still uses the real, full box width — unchanged —
-  // so tight single-line labels that are already sized to fit their own
-  // text exactly (e.g. a `.meta` span) don't get pushed into wrapping
-  // where they shouldn't. Only the drawn line's start position shifts
-  // in by `pad`, and height grows by pad top+bottom for the same reason
-  // vertically, where there's always slack to spare.
-  const pad = 2;
+  // The blur needs a little room on every side to fade out instead of
+  // hitting a hard wall right at the canvas edge (which reads as a
+  // pixelated/cut-off border). That room comes from the *overlay* image
+  // being pad px bigger than the element on each side (see below) — never
+  // from resizing the element itself, which has zero spare pixels in a
+  // tight nav/index/footer row and would just clip on the opposite edge.
+  const pad = 3;
 
   const fontSize = parseFloat(cs.fontSize) || 14;
   let lineHeight = parseFloat(cs.lineHeight);
@@ -856,13 +870,15 @@ function rasterizeOne(el, retry){
   measure.font = font;
   try { measure.letterSpacing = letterSpacing; } catch(e){}
   const lines = wrapCanvasText(measure, text, width);
-  const height = Math.ceil(lines.length * lineHeight) + pad * 2;
-  if (!height) return;
+  const textHeight = Math.ceil(lines.length * lineHeight);
+  if (!textHeight) return;
 
+  const overlayW = width + pad * 2;
+  const overlayH = textHeight + pad * 2;
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(width * dpr);
-  canvas.height = Math.ceil(height * dpr);
+  canvas.width = Math.ceil(overlayW * dpr);
+  canvas.height = Math.ceil(overlayH * dpr);
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
   ctx.font = font;
@@ -872,8 +888,8 @@ function rasterizeOne(el, retry){
   lines.forEach((line, i)=>{
     const lineWidth = ctx.measureText(line).width;
     let x = pad;
-    if (textAlign === 'center') x = (width - lineWidth) / 2;
-    else if (textAlign === 'right') x = Math.max(0, width - pad - lineWidth);
+    if (textAlign === 'center') x = pad + (width - lineWidth) / 2;
+    else if (textAlign === 'right') x = pad + width - lineWidth;
     ctx.fillText(line, x, i * lineHeight + pad);
   });
 
@@ -882,31 +898,43 @@ function rasterizeOne(el, retry){
   contrastAlpha(imgData, contrastPct);
   ctx.putImageData(imgData, 0, 0);
 
-  // A wrapped `display:inline` box (e.g. a project title <a> that spans two
-  // lines) paints its background per line-fragment, not as one continuous
-  // image — inconsistently across browsers. inline-block gives it a single
-  // unfragmented box instead, sized to match the canvas exactly.
-  if (cs.display === 'inline') {
-    el.style.setProperty('display', 'inline-block');
-    el.style.setProperty('width', `${width}px`);
-  }
-  el.style.setProperty('height', `${height}px`);
-  el.style.setProperty('background-image', `url(${canvas.toDataURL('image/png')})`);
-  el.style.setProperty('background-size', `${width}px ${height}px`);
-  el.style.setProperty('background-repeat', 'no-repeat');
-  el.style.setProperty('background-position', 'left top');
   el.style.setProperty('color', 'transparent');
   el.style.setProperty('-webkit-text-fill-color', 'transparent');
+
+  let img = rasterOverlays.get(el);
+  if (!img) {
+    img = document.createElement('img');
+    img.setAttribute('aria-hidden', 'true');
+    img.style.position = 'absolute';
+    img.style.pointerEvents = 'none';
+    document.body.appendChild(img);
+    rasterOverlays.set(el, img);
+  }
+  img.style.left = `${rect.left + window.scrollX - pad}px`;
+  img.style.top = `${rect.top + window.scrollY - pad}px`;
+  img.style.width = `${overlayW}px`;
+  img.style.height = `${overlayH}px`;
+
+  // Swap the src only once the new bitmap is fully decoded, so a real
+  // device never paints a half-decoded frame of the overlay for a tick.
+  const dataUrl = canvas.toDataURL('image/png');
+  const pre = new Image();
+  pre.src = dataUrl;
+  if (pre.decode) {
+    pre.decode().then(()=>{ img.src = dataUrl; }).catch(()=>{ img.src = dataUrl; });
+  } else {
+    img.src = dataUrl;
+  }
 
   // Real devices can still be mid-layout-shift (late webfont swap, a photo
   // above this element loading in and pushing things around) at the exact
   // moment this ran, especially right after a route change. If the box's
-  // width changed since we measured it, the image no longer matches its
-  // box — measure again and redo it once, rather than leave a stale/
-  // mis-sized image up.
+  // width changed since we measured it, the overlay no longer lines up —
+  // measure again and redo it once, rather than leave a stale/misplaced
+  // one up.
   if (!retry) {
-    const widthNow = Math.ceil(el.getBoundingClientRect().width);
-    if (Math.abs(widthNow - width) > 1) {
+    const rectNow = el.getBoundingClientRect();
+    if (Math.abs(Math.ceil(rectNow.width) - width) > 1 || Math.abs(rectNow.top - rect.top) > 1) {
       rasterizeOne(el, true);
     }
   }
