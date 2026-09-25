@@ -218,6 +218,16 @@ header.site{
   padding: 22px var(--gutter) 16px;
   padding-top: calc(env(safe-area-inset-top,0px) + 22px);
 }
+/* See the comment by #top-strip in the markup. Above header's z-index so
+   it's never itself painted over. */
+#top-strip{ display:none; }
+@media (max-width:760px){
+  #top-strip{
+    display:block; position:fixed; top:0; left:0; right:0;
+    height:calc(env(safe-area-inset-top,0px) + 22px);
+    background:var(--bg); z-index:41; pointer-events:none;
+  }
+}
 header.site .brand{
   font-family:var(--font-name);
   font-style:italic;
@@ -432,6 +442,14 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
     <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
   </defs>
 </svg>
+
+<!-- theme-color fixed this on Safari but the same dark mark still shows on
+     Chrome - and its exact corner has been reported inconsistently
+     (left, then right), which a full-width strip sidesteps entirely
+     rather than guessing which corner to patch. Covers exactly the
+     header's own top padding (an empty gap by design - the logo starts
+     right below it), so the real content is never touched. Mobile only. -->
+<div id="top-strip" aria-hidden="true"></div>
 
 <header class="site">
   <a class="brand" href="#/">Emmi Lacaux</a>
@@ -783,19 +801,23 @@ function route(){
   else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); noScroll = true; }
   else { renderNav(''); renderHome(); }
 
-  // Mobile Chrome can leave the previous page's title/text visibly stuck
-  // on screen right after a route change that follows a scroll - the DOM
-  // has genuinely already updated (this isn't a script bug, the new
-  // content is really there), the browser's compositor just hasn't
-  // repainted that region yet. Removing #app and immediately reinserting
-  // it (same tick, nothing async in between) forces a fresh paint instead
-  // of leaving it to chance - the same fix that worked for this same
-  // family of bug on the old per-element text overlays.
+  // Mobile Chrome can leave the previous page's content/title visibly
+  // stuck or mispositioned right after a route change that follows a
+  // scroll - the DOM has genuinely already updated, but what's on screen
+  // hasn't caught up. Removing and reinserting just #app didn't fully fix
+  // it (the fixed header, positioned with env(safe-area-inset-top), is a
+  // plausible separate source of this - Chrome has known issues
+  // recomputing position:fixed + safe-area layout after certain scroll
+  // sequences). Force a full-page repaint instead: this exact
+  // display:none/restore toggle is the one thing that's reliably fixed
+  // every version of this "stuck on screen" family of bug so far, on any
+  // element, at the cost of a barely-there flash - worth it over a page
+  // that's actually unusable.
   {
-    const app = document.getElementById('app');
-    const parent = app.parentNode;
-    parent.removeChild(app);
-    parent.appendChild(app);
+    const prevDisplay = document.body.style.display;
+    document.body.style.display = 'none';
+    void document.body.offsetHeight;
+    document.body.style.display = prevDisplay;
   }
 
   // Scroll to top only after the new page's content has replaced the old -
