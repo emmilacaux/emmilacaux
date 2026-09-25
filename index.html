@@ -1056,14 +1056,16 @@ function rasterizeMobileText(){
       // Mobile Chrome and Safari can both leave a freshly (re)painted overlay
       // out of the composited frame - every property checks out (decoded,
       // correct size/position, opacity settled) but it's simply never drawn
-      // until something forces a real repaint. Nudging a single element's own
-      // opacity wasn't reliable enough (still reproduced with real taps), and
-      // a scroll nudge is a no-op on a page with nothing to scroll (About,
-      // Contact - exactly where this also showed up). Toggling display on the
-      // whole page forces a full reflow+repaint unconditionally, regardless
-      // of scroll state; a route change already swaps all the content in the
-      // same instant, so one more frame of nothing painted right then is not
-      // a new gap, just a slightly longer version of the one already there.
+      // until something forces a real repaint. Tried nudging opacity instead
+      // of this (on one overlay, then on the whole body) hoping for the same
+      // fix without a visible flash - neither held up under a real tap,
+      // reproduced missing text again both times. Opacity is a compositing-
+      // stage change; it can't force a re-paint of content that was never
+      // correctly rasterized into the layer in the first place, which is
+      // the actual bug. display:none briefly removing the page from the
+      // render tree and back is the only thing that's actually held up
+      // under repeated real testing - a working page with a brief flash
+      // beats a broken one, so keep it, even though it's not free.
       Promise.all(swaps).then(()=>{
         const prevDisplay = document.body.style.display;
         document.body.style.display = 'none';
@@ -1169,6 +1171,17 @@ function route(){
 // navigation) has no reason to be involved in an SPA's hash changes and
 // was one more thing that could fight the reset.
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+
+// Reopening the site after the phone backgrounded the tab (switched apps,
+// locked the screen) doesn't run any of our code again - mobile Safari and
+// Chrome can both just resume the exact frozen page they had, scroll
+// position included, straight from their own cache (bfcache), with none
+// of this script re-executing. That's what a "loads already scrolled deep
+// into the photos" report with no navigation involved actually was.
+// pageshow's `persisted` flag is true exactly for that case.
+window.addEventListener('pageshow', (e)=>{
+  if (e.persisted) window.scrollTo(0, 0);
+});
 
 window.addEventListener('hashchange', route);
 window.addEventListener('DOMContentLoaded', route);
