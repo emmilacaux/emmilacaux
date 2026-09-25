@@ -764,14 +764,6 @@ function route(){
   const hash = location.hash.replace(/^#/, '') || '/';
   const parts = hash.split('/').filter(Boolean);
 
-  // Tapping a nav link while the page is still coasting from a momentum/
-  // fling scroll doesn't stop that momentum - it's driven by the browser's
-  // compositor, not JS, so a scrollTo(0,0) below can still lose to it a
-  // moment later as the fling keeps playing out. Briefly forcing the
-  // document non-scrollable kills any in-flight momentum outright.
-  document.documentElement.style.overflow = 'hidden';
-  requestAnimationFrame(()=>{ document.documentElement.style.overflow = ''; });
-
   let noScroll = false;
   if(parts.length === 0){ renderNav(''); renderHome(); }
   else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); noScroll = true; }
@@ -783,17 +775,16 @@ function route(){
   // Scroll to top only after the new page's content has replaced the old -
   // doing it before let the browser's scroll anchoring "helpfully" shift
   // the position again once the DOM swap landed, so a route change from a
-  // scrolled-down page could land anywhere but the top. Kept up for a
-  // short burst rather than called once: the overflow:hidden above stops
-  // most in-flight momentum, but on a hard fling on a real device it can
-  // still be playing out a bit after that, and a single scrollTo can still
-  // lose to it.
+  // scrolled-down page could land anywhere but the top. A repeated
+  // multi-frame version of this (plus a momentum-killing overflow:hidden
+  // toggle) turned out to be what was triggering a real bug: on a real
+  // device, hammering scrollTo(0,0) like that could fire Safari's own
+  // pull-to-refresh indicator, which is exactly the small dark mark that
+  // was showing up at the top of the page. One immediate call plus one
+  // more a frame later is enough for the actual scroll-position bug
+  // without tripping that.
   window.scrollTo(0,0);
-  let scrollLockFrames = 0;
-  (function holdScrollTop(){
-    window.scrollTo(0,0);
-    if (++scrollLockFrames < 10) requestAnimationFrame(holdScrollTop);
-  })();
+  requestAnimationFrame(()=>window.scrollTo(0,0));
 
   // Work (index), About and Contact are all short enough to fit one
   // screen by design - there's nothing below the fold to scroll to. Every
@@ -803,9 +794,7 @@ function route(){
   // document physically unable to scroll at all on these three pages.
   // Mobile only - on desktop a short browser window could still need to
   // scroll a page that's normally one screen, and trapping that with no
-  // way out would be a real accessibility problem, not a fix. Deferred a
-  // frame past the holdScrollTop burst above, which needs scrolling to
-  // still work while it runs.
+  // way out would be a real accessibility problem, not a fix.
   requestAnimationFrame(()=>{
     document.documentElement.style.overflow = (noScroll && window.innerWidth <= 760) ? 'hidden' : '';
   });
