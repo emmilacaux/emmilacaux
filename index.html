@@ -218,18 +218,6 @@ header.site{
   padding: 22px var(--gutter) 16px;
   padding-top: calc(env(safe-area-inset-top,0px) + 22px);
 }
-/* See the comment by #corner-patch in the markup - sized to the header's
-   own top padding (the real logo starts below that, never touched), just
-   wide enough to cover the mark with slack to spare. Above the header's
-   z-index so it isn't itself painted over by anything. */
-#corner-patch{ display:none; }
-@media (max-width:760px){
-  #corner-patch{
-    display:block; position:fixed; top:0; left:0;
-    width:80px; height:calc(env(safe-area-inset-top,0px) + 22px);
-    background:var(--bg); z-index:41; pointer-events:none;
-  }
-}
 header.site .brand{
   font-family:var(--font-name);
   font-style:italic;
@@ -444,16 +432,6 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
     <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
   </defs>
 </svg>
-
-<!-- A small dark mark keeps showing at the very top-left corner on real
-     mobile devices (both Safari and Chrome), not caused by the SVG above
-     after all (still there with it hidden every way tried) and not
-     interactive (a paint artifact, not real content) - unclear what's
-     actually producing it. Pragmatic patch while that's still unresolved:
-     paint over that exact corner with the page's own background color,
-     above everything else. Mobile only, sized to the header's own top
-     padding so it can't cover the real logo. -->
-<div id="corner-patch" aria-hidden="true"></div>
 
 <header class="site">
   <a class="brand" href="#/">Emmi Lacaux</a>
