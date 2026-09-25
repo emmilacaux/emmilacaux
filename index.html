@@ -189,11 +189,16 @@ html{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--bg); }
   transition:none !important;
   animation:none !important;
 }
-.link:hover,
-.link.active:hover{
-  color:var(--red);
-  text-decoration:underline;
-  text-decoration-color:var(--red);
+/* (hover:hover) excludes touch: a tap "hovers" a link but there's no
+   mouse to leave afterward, so without this guard the red/underline from
+   :hover just stays stuck on whatever you last tapped, forever. */
+@media (hover:hover){
+  .link:hover,
+  .link.active:hover{
+    color:var(--red);
+    text-decoration:underline;
+    text-decoration-color:var(--red);
+  }
 }
 
 /* ---------------- header / nav ---------------- */
@@ -225,11 +230,13 @@ header.site .brand{
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
    On home there's nowhere to go back to, so no underline. */
-.not-home header.site .brand:hover{
-  text-decoration:underline;
-  text-decoration-color:var(--red);
-  text-underline-offset:3px;
-  text-decoration-thickness:1px;
+@media (hover:hover){
+  .not-home header.site .brand:hover{
+    text-decoration:underline;
+    text-decoration-color:var(--red);
+    text-underline-offset:3px;
+    text-decoration-thickness:1px;
+  }
 }
 header.site nav{ display:flex; gap: 22px; }
 header.site nav a{ font-size:.8rem; }
@@ -493,6 +500,15 @@ function photoDiv({ratio='r-3-2', scale='sc-m', align='left', caption, src, alt=
     img.src = src;
     img.alt = alt || '';
     img.loading = 'eager';
+    // No explicit width/height on these (they render at their own natural
+    // ratio, portrait or landscape), so each one goes from 0 height to its
+    // real height the moment it loads - shifting everything below it
+    // downward. On mobile that left already-rasterized text sitting at its
+    // old (pre-shift) position for a beat: it'd disappear when the next
+    // pass cleared it and reappear once repositioned, reading as a flicker.
+    // Re-rasterizing on every image load keeps text glued to the real
+    // layout as it settles instead of catching up on a fixed delay.
+    img.addEventListener('load', rasterizeMobileText);
     p.appendChild(img);
   } else {
     p.className = `photo ${ratio}`; // neutral box only, no gradient — "image will be here"
@@ -946,10 +962,15 @@ function rasterizeOne(el, retry){
   // out of the composited frame after a route change - the element is
   // correctly sized/positioned/decoded (verified), it's just never
   // actually drawn until *something* forces a repaint, which is why it
-  // looked fixed by "nothing" (a later unrelated scroll/resize). Force
-  // that repaint ourselves right after each swap instead of hoping one
-  // happens to come along.
-  const forceRepaint = () => { void img.offsetHeight; };
+  // looked fixed by "nothing" (a later unrelated scroll/resize). A src
+  // swap alone doesn't change layout, so reading offsetHeight (which only
+  // forces layout) isn't reliable here - what actually needs forcing is
+  // recompositing. Nudging opacity is the standard trick for that: it's
+  // imperceptible but makes the browser recomposite this element's layer.
+  const forceRepaint = () => {
+    img.style.opacity = '0.999';
+    requestAnimationFrame(()=>{ img.style.opacity = '1'; });
+  };
   if (pre.decode) {
     pre.decode().then(()=>{ img.src = dataUrl; forceRepaint(); }).catch(()=>{ img.src = dataUrl; forceRepaint(); });
   } else {
