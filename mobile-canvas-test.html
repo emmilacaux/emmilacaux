@@ -51,6 +51,14 @@ h1{ font-size:.85rem; font-weight:400; margin:0 0 8px; }
 <div class="row"><div class="tag">O7 — 3 pasadas, radius 0.55 c/u, contrast 180%</div><div class="sample" id="o7">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">O8 — 3 pasadas, radius 0.55 c/u, contrast 200%</div><div class="sample" id="o8">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">O9 — 3 pasadas, radius 0.6 c/u, contrast 200%</div><div class="sample" id="o9">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P1 — 3 pasadas, radius 0.15 c/u, contrast 180%</div><div class="sample" id="p1">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P2 — 3 pasadas, radius 0.15 c/u, contrast 220%</div><div class="sample" id="p2">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P3 — 3 pasadas, radius 0.2 c/u, contrast 180%</div><div class="sample" id="p3">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P4 — 3 pasadas, radius 0.2 c/u, contrast 220%</div><div class="sample" id="p4">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P5 — 3 pasadas, radius 0.25 c/u, contrast 180%</div><div class="sample" id="p5">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P6 — 3 pasadas, radius 0.25 c/u, contrast 220%</div><div class="sample" id="p6">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P7 — 1 pasada sola, radius 0.2, contrast 200%</div><div class="sample" id="p7">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">P8 — 1 pasada sola, radius 0.25, contrast 200%</div><div class="sample" id="p8">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">Control — sin efecto (texto real, sin canvas)</div><div class="sample">Blurry memories from the best of this summer.</div></div>
 
 <script>
@@ -178,6 +186,14 @@ document.fonts.ready.then(()=>{
   rasterize(document.getElementById('o7'), triple(0.55), 180);
   rasterize(document.getElementById('o8'), triple(0.55), 200);
   rasterize(document.getElementById('o9'), triple(0.6), 200);
+  rasterize(document.getElementById('p1'), triple(0.15), 180);
+  rasterize(document.getElementById('p2'), triple(0.15), 220);
+  rasterize(document.getElementById('p3'), triple(0.2), 180);
+  rasterize(document.getElementById('p4'), triple(0.2), 220);
+  rasterize(document.getElementById('p5'), triple(0.25), 180);
+  rasterize(document.getElementById('p6'), triple(0.25), 220);
+  rasterize(document.getElementById('p7'), single(0.2), 200);
+  rasterize(document.getElementById('p8'), single(0.25), 200);
 });
 </script>
 </body>
