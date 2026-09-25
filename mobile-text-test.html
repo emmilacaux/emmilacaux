@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mobile Text Effect Test — no images</title>
+<style>
+@font-face{
+  font-family:'Generic G20-FR Classic';
+  src: url('fonts/Generic-G20-FR-Classic-DEMO.otf') format('opentype');
+  font-display: swap;
+}
+:root{
+  --bg:#FFFFFF; --ink:#111111; --muted:#5E5A57; --line:#D7D2CE; --red:#8B1114;
+}
+*{ box-sizing:border-box; }
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Generic G20-FR Classic', sans-serif;
+  margin:0; padding: 24px 20px 100px;
+}
+h1{ font-size:.85rem; font-weight:400; margin:0 0 6px; }
+.intro{ font-size:.72rem; color:var(--muted); line-height:1.6; margin:0 0 8px; }
+.intro b{ color:var(--ink); }
+.section-label{
+  font-size:.68rem; color:var(--red); text-transform:uppercase; letter-spacing:.04em;
+  margin: 34px 0 4px;
+}
+.row{ padding: 16px 0; border-top:1px solid var(--line); }
+.row:last-child{ border-bottom:1px solid var(--line); }
+.tag{ font-size:.66rem; color:var(--red); margin-bottom:8px; }
+.sample-p{ font-size:14px; line-height:1.75; max-width: 34ch; }
+.sample-label{ font-size:15px; font-weight:700; }
+
+/* ---------- SVG filter defs (feGaussianBlur + contrast) ---------- */
+</style>
+</head>
+<body>
+
+<h1>Prueba de efecto sin imágenes — texto real</h1>
+<p class="intro">Todo aquí es <b>texto de verdad</b>, sin canvas, sin overlay, sin JS. Si alguna de estas variantes se ve bien en tu móvil (parecida a lo que ves en ordenador), podemos dejar de necesitar todo el sistema de imágenes duplicadas. Marca el número que se acerque más a la sensación "digitalizada / grano" del sitio, tanto en el párrafo como en la etiqueta en negrita.</p>
+
+<p class="intro"><b>Referencia (ordenador):</b> blur(.6px) contrast(200%) en el párrafo normal, blur(.375px) contrast(145%) en el nombre/etiquetas — un grano sutil, no una mancha.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="svgA"><feGaussianBlur stdDeviation="0.3"/><feComponentTransfer><feFuncA type="linear" slope="3" intercept="-0.9"/></feComponentTransfer></filter>
+    <filter id="svgB"><feGaussianBlur stdDeviation="0.45"/><feComponentTransfer><feFuncA type="linear" slope="2.4" intercept="-0.7"/></feComponentTransfer></filter>
+    <filter id="svgC"><feGaussianBlur stdDeviation="0.6"/><feComponentTransfer><feFuncA type="linear" slope="2" intercept="-0.5"/></feComponentTransfer></filter>
+    <filter id="svgD"><feGaussianBlur stdDeviation="0.8"/><feComponentTransfer><feFuncA type="linear" slope="1.6" intercept="-0.3"/></feComponentTransfer></filter>
+    <filter id="svgE"><feGaussianBlur stdDeviation="0.3"/></filter>
+    <filter id="svgF"><feGaussianBlur stdDeviation="0.6"/></filter>
+  </defs>
+</svg>
+
+<div class="section-label">A — filtro SVG (feGaussianBlur + contraste), en texto real</div>
+
+<div class="row">
+  <div class="tag">SVG-A — blur 0.3 + contraste fuerte</div>
+  <div class="sample-p" style="filter:url(#svgA)">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="filter:url(#svgA); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">SVG-B — blur 0.45 + contraste medio-fuerte</div>
+  <div class="sample-p" style="filter:url(#svgB)">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="filter:url(#svgB); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">SVG-C — blur 0.6 + contraste medio (más cercano a desktop)</div>
+  <div class="sample-p" style="filter:url(#svgC)">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="filter:url(#svgC); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">SVG-D — blur 0.8 + contraste suave</div>
+  <div class="sample-p" style="filter:url(#svgD)">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="filter:url(#svgD); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">SVG-E — blur 0.3, sin contraste añadido</div>
+  <div class="sample-p" style="filter:url(#svgE)">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="filter:url(#svgE); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">SVG-F — blur 0.6, sin contraste añadido</div>
+  <div class="sample-p" style="filter:url(#svgF)">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="filter:url(#svgF); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+
+<div class="section-label">B — text-shadow apilado (texto real, sin filter de ningún tipo)</div>
+
+<div class="row">
+  <div class="tag">TS-A — 1 sombra, blur 1px</div>
+  <div class="sample-p" style="color:transparent; text-shadow:0 0 1px var(--ink);">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="color:transparent; text-shadow:0 0 1px var(--ink); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">TS-B — 2 sombras apiladas, blur 0.6px</div>
+  <div class="sample-p" style="color:transparent; text-shadow:0 0 0.6px var(--ink), 0 0 0.6px var(--ink);">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="color:transparent; text-shadow:0 0 0.6px var(--ink), 0 0 0.6px var(--ink); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">TS-C — texto sólido + 1 sombra suave encima (grano ligero)</div>
+  <div class="sample-p" style="color:var(--ink); text-shadow:0 0 0.8px var(--ink);">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="color:var(--ink); text-shadow:0 0 0.8px var(--ink); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">TS-D — texto semi-transparente + sombra (más difuminado)</div>
+  <div class="sample-p" style="color:rgba(17,17,17,.55); text-shadow:0 0 1.2px var(--ink), 0 0 1.2px var(--ink);">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="color:rgba(17,17,17,.55); text-shadow:0 0 1.2px var(--ink), 0 0 1.2px var(--ink); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+<div class="row">
+  <div class="tag">TS-E — 4 sombras pequeñas desplazadas (grano/textura)</div>
+  <div class="sample-p" style="color:transparent; text-shadow:0.3px 0 0.5px var(--ink), -0.3px 0 0.5px var(--ink), 0 0.3px 0.5px var(--ink), 0 -0.3px 0.5px var(--ink);">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="color:transparent; text-shadow:0.3px 0 0.5px var(--ink), -0.3px 0 0.5px var(--ink), 0 0.3px 0.5px var(--ink), 0 -0.3px 0.5px var(--ink); margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+
+<div class="section-label">Control</div>
+<div class="row">
+  <div class="tag">Sin efecto — texto normal</div>
+  <div class="sample-p">Blurry memories from the best of this summer, love to everyone who was part of my path.</div>
+  <div class="sample-label" style="margin-top:10px;">01 — Galactica — Ibiza 2026</div>
+</div>
+
+</body>
+</html>
