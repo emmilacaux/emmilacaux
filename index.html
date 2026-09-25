@@ -116,6 +116,24 @@ img,svg{ max-width:100%; display:block; }
 .page-simple .contact-link, .link{
   filter: blur(.6px) contrast(200%);
 }
+/* Live CSS `filter: blur()` on text is unusable on phone screens — proven
+   across dozens of tested magnitudes (from .0001px to 1.3px) and contrast
+   values: it always renders as a hard blob, never the grain seen here on
+   desktop. So on narrow viewports the live filter is off, and a script
+   (bottom of page, see rasterizeMobileText) bakes the equivalent texture
+   into a Canvas-2D-rendered bitmap per text element instead — manual
+   pixel math (blur+contrast on the alpha channel), not the browser's own
+   filter or ctx.filter (also unreliable on real Safari). Chosen after
+   on-device comparison at mobile-canvas-test.html: variant "N3-5". */
+@media (max-width:760px){
+  .photo-caption, .fragment, .label-inline, .counter, .meta,
+  .nextprev a, .site-footer, .project-head .title, .index-item,
+  .index-head, .page-simple h1:not(.brand-name), .page-simple p,
+  .page-simple .field-label, .page-simple .field-value,
+  .page-simple .contact-link, .link{
+    filter: none;
+  }
+}
 a{ color:inherit; text-decoration:none; }
 ::selection{ background:transparent; color:var(--red); text-decoration:underline; text-decoration-color:var(--red); text-decoration-thickness:1px; transition:none !important; }
 
@@ -196,6 +214,9 @@ header.site .brand{
   /* lighter dose of the digitized texture than body text, so the name
      stays the cleanest thing on the page — bumped up a touch. */
   filter: blur(.375px) contrast(145%);
+}
+@media (max-width:760px){
+  header.site .brand{ filter: none; }
 }
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
@@ -528,7 +549,7 @@ function appendFooter(app, opts={}){
     <span class="footer-left">
       <a class="link${opts.noTop ? ' no-top' : ''}" href="#top" data-top="1">Go to top</a>${opts.noTop ? '<span class="no-top-msg" hidden>no where to go</span>' : ''}
     </span>
-    <span>Archive / 2026</span>
+    <span class="archive-date">Archive / 2026</span>
   `;
   app.appendChild(f);
   const topLink = f.querySelector('[data-top]');
@@ -538,6 +559,7 @@ function appendFooter(app, opts={}){
     if(opts.noTop){
       const msg = f.querySelector('.no-top-msg');
       msg.hidden = false;
+      if (isMobileView()) rasterizeOne(msg);
       clearTimeout(noTopTimer);
       noTopTimer = setTimeout(()=>{ msg.hidden = true; }, 2200);
     } else {
@@ -688,6 +710,201 @@ function renderContact(){
   setupCounter(null);
 }
 
+/* ---------------------------- mobile text rasterization ----------------------------
+   Live CSS `filter: blur()` is unusable on phone screens (see the CSS
+   comment above the mobile @media block) — always a hard blob, in every
+   mobile browser, at every magnitude tried. This bakes the equivalent
+   texture into a Canvas-2D bitmap per text element instead, using manual
+   pixel math (not the browser's blur, not ctx.filter — also unreliable on
+   real Safari): a 3-pass box blur on the alpha channel approximates a
+   Gaussian (smoother falloff than one big box blur, so tight letter
+   counters like the eye of an "e" don't bridge shut), then a contrast
+   curve on that same alpha hardens the edge. Parameters ("N3-5") were
+   picked by eye on a real phone at mobile-canvas-test.html. The bitmap is
+   painted as a background-image positioned over the now-transparent-inked
+   real text, so the text itself, its click targets and its accessibility
+   all stay exactly where they were. Runs only on narrow (mobile)
+   viewports; desktop keeps the plain live CSS filter, unaffected. */
+const MOBILE_TEXT_SELECTOR = '.photo-caption, .fragment, .label-inline, .counter, ' +
+  '.meta span, .site-footer .archive-date, .no-top-msg, .project-head .title, ' +
+  '.index-item .no, .index-item .cat, .index-item .yr, .index-head, ' +
+  '.page-simple h1:not(.brand-name), .page-simple p, .page-simple .field-label, ' +
+  '.page-simple .field-value, .link, header.site .brand';
+
+function isMobileView(){ return window.matchMedia('(max-width:760px)').matches; }
+
+function clearRasterizedText(){
+  document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
+    el.style.removeProperty('background-image');
+    el.style.removeProperty('background-size');
+    el.style.removeProperty('background-repeat');
+    el.style.removeProperty('background-position');
+    el.style.removeProperty('color');
+    el.style.removeProperty('-webkit-text-fill-color');
+    el.style.removeProperty('display');
+    el.style.removeProperty('width');
+    el.style.removeProperty('height');
+  });
+}
+
+// Fractional-radius box blur on the alpha channel (the ink itself is a
+// flat fill color; only the anti-aliased edge *coverage* varies).
+function boxBlurAlpha(imageData, radius){
+  if (radius <= 0) return;
+  const { data, width, height } = imageData;
+  const r = Math.floor(radius);
+  const frac = radius - r;
+  const tmp = new Float32Array(width * height);
+  for (let y = 0; y < height; y++){
+    for (let x = 0; x < width; x++){
+      let sum = 0, weight = 0;
+      for (let dx = -r; dx <= r; dx++){
+        const nx = x + dx;
+        if (nx >= 0 && nx < width){ sum += data[(y * width + nx) * 4 + 3]; weight += 1; }
+      }
+      if (frac > 0){
+        const lx = x - r - 1, rx = x + r + 1;
+        if (lx >= 0){ sum += data[(y * width + lx) * 4 + 3] * frac; weight += frac; }
+        if (rx < width){ sum += data[(y * width + rx) * 4 + 3] * frac; weight += frac; }
+      }
+      tmp[y * width + x] = sum / weight;
+    }
+  }
+  for (let x = 0; x < width; x++){
+    for (let y = 0; y < height; y++){
+      let sum = 0, weight = 0;
+      for (let dy = -r; dy <= r; dy++){
+        const ny = y + dy;
+        if (ny >= 0 && ny < height){ sum += tmp[ny * width + x]; weight += 1; }
+      }
+      if (frac > 0){
+        const ly = y - r - 1, ry = y + r + 1;
+        if (ly >= 0){ sum += tmp[ly * width + x] * frac; weight += frac; }
+        if (ry < height){ sum += tmp[ry * width + x] * frac; weight += frac; }
+      }
+      data[(y * width + x) * 4 + 3] = Math.round(sum / weight);
+    }
+  }
+}
+// 3 passes of a small box blur approximate a Gaussian — energy concentrates
+// near the center and tapers off, instead of spreading dead-evenly across
+// the whole radius the way one big box blur pass does.
+function gaussianApproxAlpha(imageData, radiusPerPass, passes){
+  for (let i = 0; i < passes; i++) boxBlurAlpha(imageData, radiusPerPass);
+}
+function contrastAlpha(imageData, contrastPct){
+  const factor = contrastPct / 100;
+  const { data } = imageData;
+  for (let i = 3; i < data.length; i += 4){
+    const a = (data[i] / 255 - 0.5) * factor + 0.5;
+    data[i] = Math.max(0, Math.min(255, Math.round(a * 255)));
+  }
+}
+
+function wrapCanvasText(ctx, text, maxWidth){
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  words.forEach(word=>{
+    const test = line ? line + ' ' + word : word;
+    if (line && ctx.measureText(test).width > maxWidth) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+function rasterizeOne(el){
+  const text = (el.textContent || '').trim();
+  if (!text) return;
+  const width = Math.ceil(el.getBoundingClientRect().width);
+  if (!width) return;
+
+  const cs = getComputedStyle(el);
+  // "Emmi Lacaux" gets a lighter dose than body text, same relationship
+  // as its desktop filter (blur(.375px)/contrast(145%) vs body's
+  // blur(.6px)/contrast(200%)) — the name stays the cleanest thing here too.
+  const isBrand = el.matches('header.site .brand');
+  const radiusPerPass = 0.375;
+  const contrastPct = isBrand ? 115 : 125;
+
+  const fontSize = parseFloat(cs.fontSize) || 14;
+  let lineHeight = parseFloat(cs.lineHeight);
+  if (!lineHeight || isNaN(lineHeight)) lineHeight = fontSize * 1.3;
+  const textAlign = cs.textAlign === 'start' ? 'left' : cs.textAlign;
+  const font = `${cs.fontStyle} ${cs.fontWeight} ${fontSize}px ${cs.fontFamily}`;
+
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const lines = wrapCanvasText(measure, text, width);
+  const height = Math.ceil(lines.length * lineHeight);
+  if (!height) return;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(width * dpr);
+  canvas.height = Math.ceil(height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.font = font;
+  ctx.fillStyle = cs.color;
+  ctx.textBaseline = 'top';
+  lines.forEach((line, i)=>{
+    const lineWidth = ctx.measureText(line).width;
+    let x = 0;
+    if (textAlign === 'center') x = (width - lineWidth) / 2;
+    else if (textAlign === 'right') x = width - lineWidth;
+    ctx.fillText(line, x, i * lineHeight);
+  });
+
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  gaussianApproxAlpha(imgData, radiusPerPass * dpr, 3);
+  contrastAlpha(imgData, contrastPct);
+  ctx.putImageData(imgData, 0, 0);
+
+  // A wrapped `display:inline` box (e.g. a project title <a> that spans two
+  // lines) paints its background per line-fragment, not as one continuous
+  // image — inconsistently across browsers. inline-block gives it a single
+  // unfragmented box instead, sized to match the canvas exactly.
+  if (cs.display === 'inline') {
+    el.style.setProperty('display', 'inline-block');
+    el.style.setProperty('width', `${width}px`);
+  }
+  el.style.setProperty('height', `${height}px`);
+  el.style.setProperty('background-image', `url(${canvas.toDataURL('image/png')})`);
+  el.style.setProperty('background-size', `${width}px ${height}px`);
+  el.style.setProperty('background-repeat', 'no-repeat');
+  el.style.setProperty('background-position', 'left top');
+  el.style.setProperty('color', 'transparent');
+  el.style.setProperty('-webkit-text-fill-color', 'transparent');
+}
+
+let rasterizeScheduled = false;
+function rasterizeMobileText(){
+  if (rasterizeScheduled) return;
+  rasterizeScheduled = true;
+  requestAnimationFrame(()=>{
+    rasterizeScheduled = false;
+    clearRasterizedText();
+    if (!isMobileView()) return;
+    document.querySelectorAll(MOBILE_TEXT_SELECTOR).forEach(el=>{
+      if (el.hidden || el.offsetParent === null) return; // skip hidden (e.g. .no-top-msg before its first click)
+      rasterizeOne(el);
+    });
+  });
+}
+
+let mobileTextResizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(mobileTextResizeTimer);
+  mobileTextResizeTimer = setTimeout(rasterizeMobileText, 200);
+});
+document.fonts.ready.then(rasterizeMobileText);
+
 /* ---------------------------- router ---------------------------- */
 
 function renderNav(active){
@@ -712,6 +929,8 @@ function route(){
   else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); }
   else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); }
   else { renderNav(''); renderHome(); }
+
+  rasterizeMobileText();
 }
 
 window.addEventListener('hashchange', route);
@@ -725,11 +944,13 @@ function setupCounter(total){
   if(!total){ el.textContent = ''; return; }
   const imgs = Array.from(document.querySelectorAll('[data-is-image="1"]'));
   el.textContent = `01 / ${String(total).padStart(2,'0')}`;
+  if (isMobileView()) rasterizeOne(el);
   counterObserver = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{
       if(e.isIntersecting){
         const i = imgs.indexOf(e.target) + 1;
         if(i > 0) el.textContent = `${String(i).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
+        if (isMobileView()) rasterizeOne(el);
       }
     });
   }, { threshold: 0.5 });
