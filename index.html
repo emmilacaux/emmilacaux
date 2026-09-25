@@ -91,17 +91,6 @@
 html{ scroll-padding-top: env(safe-area-inset-top,0px); }
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
-/* This is a full SPA re-render per route, not a page that grows content
-   above the fold gradually - scroll anchoring's "helpful" scroll-position
-   correction just fights the deliberate scroll-to-top on navigation. */
-html{ overflow-anchor:none; }
-/* No rubber-band bounce past the top or bottom edge - on a page short
-   enough to not scroll at all (About, Contact) there's nothing beyond
-   either edge to justify it, and the bounce-and-settle animation was
-   very likely part of why a route change could still end up not quite
-   at scrollY 0: the browser's own overscroll rebound fighting the
-   scroll-to-top after it already ran. */
-html, body{ overscroll-behavior-y: none; }
 body{
   background:var(--bg);
   color:var(--ink);
@@ -196,37 +185,8 @@ html{ scrollbar-width:thin; scrollbar-color:var(--muted) var(--bg); }
   transition:none !important;
   animation:none !important;
 }
-/* On mobile this text is made invisible in favor of the rasterized
-   overlay drawn on top of it - it's still real, present, selectable text
-   underneath, though, so holding a tap on it can bring up the OS's text
-   selection UI (a selection box with no visible text to justify it,
-   since what you actually see is the image above). It was never meant to
-   be selected - it's link chrome - so suppress that on mobile only. */
-@media (max-width:760px){
-  .link, header.site .brand{
-    -webkit-touch-callout:none;
-    -webkit-user-select:none;
-    user-select:none;
-  }
-}
-/* (hover:hover) excludes touch: a tap "hovers" a link but there's no
-   mouse to leave afterward, so without this guard the red/underline from
-   :hover just stays stuck on whatever you last tapped, forever. */
-@media (hover:hover){
-  .link:hover,
-  .link.active:hover{
-    color:var(--red);
-    text-decoration:underline;
-    text-decoration-color:var(--red);
-  }
-}
-/* :active is the touch equivalent - it only applies while the finger is
-   actually down and releases the instant it lifts (unlike :hover, it was
-   never the thing getting stuck), so it needs no (hover:hover) guard. This
-   is what gives a tap on mobile the same red+underline flash a mouse hover
-   gives on desktop, without ever risking it staying on afterward. */
-.link:active,
-.link.active:active{
+.link:hover,
+.link.active:hover{
   color:var(--red);
   text-decoration:underline;
   text-decoration-color:var(--red);
@@ -261,15 +221,7 @@ header.site .brand{
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
    On home there's nowhere to go back to, so no underline. */
-@media (hover:hover){
-  .not-home header.site .brand:hover{
-    text-decoration:underline;
-    text-decoration-color:var(--red);
-    text-underline-offset:3px;
-    text-decoration-thickness:1px;
-  }
-}
-.not-home header.site .brand:active{
+.not-home header.site .brand:hover{
   text-decoration:underline;
   text-decoration-color:var(--red);
   text-underline-offset:3px;
@@ -283,23 +235,7 @@ header.site nav a{ font-size:.8rem; }
 }
 
 /* ---------------- app shell ---------------- */
-/* 100vh on a mobile browser is sized to the *largest* possible viewport
-   (toolbar collapsed), not what's actually on screen - min-height:100vh
-   alone made #app a little taller than the real visible area whenever the
-   address bar was showing, which is exactly what let a short page like
-   About or Contact drag down "a little" into nothing. 100dvh tracks the
-   real, current viewport instead; the plain vh rule stays first as a
-   fallback for browsers that don't support dvh. */
-#app{ min-height:100vh; min-height:100dvh; padding-top:64px; padding-bottom:14vh; }
-/* That 14vh is deliberate breathing room after the footer, part of the
-   desktop design language - kept as-is there. On mobile it's exactly the
-   extra scrollable emptiness the user asked to get rid of: real, physical
-   padding still counts toward the page's scrollable height no matter what
-   min-height says, dvh or not. Dropping it there (mobile only, desktop
-   untouched) removes that room instead of just resizing it. */
-@media (max-width:760px){
-  #app{ padding-bottom:0; }
-}
+#app{ min-height:100vh; padding-top:64px; padding-bottom:14vh; }
 .field{ position:relative; width:100%; padding: 0 var(--gutter); }
 
 .pause-xs{ height: clamp(28px, 5vh, 56px); }
@@ -789,21 +725,16 @@ function renderContact(){
 }
 
 /* ---------------------------- mobile text effect ----------------------------
-   Used to be a Canvas-rasterized bitmap overlay, JS-positioned in sync
-   with the real (hidden) text on every scroll/resize/route change/image
-   load - CSS filter:blur() alone was unusable on real phone screens (a
-   hard blob at every magnitude tried, in every mobile browser). That
-   overlay approach worked but meant reimplementing, by hand, everything
-   the browser already does for free for real text: track scroll, track
-   resize, survive route changes, repaint reliably. Every one of those
-   was a fresh bug. Replaced with an SVG filter (feGaussianBlur, no
-   contrast stage) applied straight to the real, live text via CSS
-   `filter: url(#id)` - a different rendering path than the plain CSS
-   `blur()` shorthand, and one that (confirmed on-device at
+   Used to be a Canvas-rasterized bitmap painted as a background-image on
+   each text element, JS-triggered on load/resize - CSS filter:blur()
+   alone was unusable on real phone screens (a hard blob at every
+   magnitude tried, in every mobile browser). Replaced with an SVG filter
+   (feGaussianBlur, no contrast stage) applied straight to the real, live
+   text via CSS `filter: url(#id)` - a different rendering path than the
+   plain CSS `blur()` shorthand, and one that (confirmed on-device at
    mobile-text-test.html, variant SVG-F) actually renders correctly on
-   real mobile browsers. The text is real again: the browser positions it,
-   same as it always has, same as desktop. See the SVG <defs> near the top
-   of <body> for the actual filters. */
+   real mobile browsers. No JS needed for this at all any more. See the
+   SVG <defs> near the top of <body> for the actual filters. */
 
 /* ---------------------------- router ---------------------------- */
 
@@ -821,15 +752,7 @@ function renderNav(active){
 function route(){
   const hash = location.hash.replace(/^#/, '') || '/';
   const parts = hash.split('/').filter(Boolean);
-
-  // Tapping a nav link while the page is still coasting from a momentum/
-  // fling scroll doesn't stop that momentum - it's driven by the browser's
-  // compositor, not JS, so a plain scrollTo(0,0) below gets overridden a
-  // moment later as the fling keeps playing out, landing the new page
-  // scrolled down instead of at the top. Briefly forcing the document
-  // non-scrollable kills any in-flight momentum outright.
-  document.documentElement.style.overflow = 'hidden';
-  requestAnimationFrame(()=>{ document.documentElement.style.overflow = ''; });
+  window.scrollTo(0,0);
 
   if(parts.length === 0){ renderNav(''); renderHome(); }
   else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); }
@@ -837,42 +760,7 @@ function route(){
   else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); }
   else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); }
   else { renderNav(''); renderHome(); }
-
-  // Scroll to top only after the new page's content has replaced the old -
-  // doing it before let the browser's scroll anchoring "helpfully" shift
-  // the position again once the DOM swap landed, so a route change from a
-  // scrolled-down page could land anywhere but the top. Kept up for a
-  // short burst rather than called once: the overflow:hidden above stops
-  // most in-flight momentum, but on a hard fling it can still be playing
-  // out a bit after that, and a single scrollTo can still lose to it.
-  window.scrollTo(0,0);
-  let scrollLockFrames = 0;
-  (function holdScrollTop(){
-    window.scrollTo(0,0);
-    if (++scrollLockFrames < 12) requestAnimationFrame(holdScrollTop);
-  })();
-
-  // A second pass shortly after: catches a scroll position that's still
-  // settling on a real device right after navigation.
-  setTimeout(()=>{ window.scrollTo(0,0); }, 350);
 }
-
-// Leave scroll position entirely to route()'s own scroll-to-top - the
-// browser's default auto-restoration (meant for real back/forward
-// navigation) has no reason to be involved in an SPA's hash changes and
-// was one more thing that could fight the reset.
-if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-
-// Reopening the site after the phone backgrounded the tab (switched apps,
-// locked the screen) doesn't run any of our code again - mobile Safari and
-// Chrome can both just resume the exact frozen page they had, scroll
-// position included, straight from their own cache (bfcache), with none
-// of this script re-executing. That's what a "loads already scrolled deep
-// into the photos" report with no navigation involved actually was.
-// pageshow's `persisted` flag is true exactly for that case.
-window.addEventListener('pageshow', (e)=>{
-  if (e.persisted) window.scrollTo(0, 0);
-});
 
 window.addEventListener('hashchange', route);
 window.addEventListener('DOMContentLoaded', route);
