@@ -126,21 +126,21 @@ img,svg{ max-width:100%; display:block; }
   filter: blur(.6px) contrast(200%);
 }
 /* The plain CSS `filter: blur()` shorthand above is unusable on phone
-   screens — proven across dozens of tested magnitudes and contrast
-   values, it always renders as a hard blob, never the grain seen here on
-   desktop, in every mobile browser tried. An SVG filter (feGaussianBlur),
-   applied via filter:url(#id) instead of the blur() shorthand, goes
-   through a different rendering path and does render correctly on real
-   mobile browsers - confirmed on-device at mobile-text-test.html, variant
-   "SVG-F". See the <svg><defs> near the top of <body> for the filter
-   itself. */
+   screens — a hard blob, never the grain seen here on desktop, in every
+   mobile browser tried. An SVG filter (feGaussianBlur via filter:url(#id))
+   was tried as a fix - it did render the grain correctly, but the <svg>
+   holding its <defs> kept painting a small stray black mark on real
+   Safari no matter how it was hidden (0-size, clipped, parked off-screen
+   thousands of pixels away - nothing stopped it). Not worth a visible bug
+   on every page for the sake of the mobile effect, so back to no effect
+   here at all - desktop is unaffected. */
 @media (max-width:760px){
   .photo-caption, .fragment, .label-inline, .counter, .meta,
   .nextprev a, .site-footer, .project-head .title, .index-item,
   .index-head, .page-simple h1:not(.brand-name), .page-simple p,
   .page-simple .field-label, .page-simple .field-value,
   .page-simple .contact-link, .link{
-    filter: url(#mobileTextBlur);
+    filter: none;
   }
 }
 a{ color:inherit; text-decoration:none; }
@@ -225,7 +225,7 @@ header.site .brand{
   filter: blur(.375px) contrast(145%);
 }
 @media (max-width:760px){
-  header.site .brand{ filter: url(#mobileBrandBlur); }
+  header.site .brand{ filter: none; }
 }
 /* On any page but home, the name is also the way back — hovering it
    underlines, same red, same rule as every other link on the site.
@@ -404,28 +404,6 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
 </style>
 </head>
 <body>
-
-<!-- Mobile text effect: SVG feGaussianBlur, applied via filter:url(#id) in
-     the mobile media queries above (CSS `filter: blur()` proved unusable
-     on real phone screens; this different rendering path isn't). Picked
-     on-device at mobile-text-test.html, variant "SVG-F" (blur only, no
-     added contrast stage). The brand name gets a lighter dose, same 0.6/
-     0.375 ratio as the desktop blur(.6px)/blur(.375px) pair, so it stays
-     the cleanest thing on the page there too. Never shown - just how
-     content-invisible varies by browser: 0x0 + position:absolute alone
-     still rendered as a small visible black mark in real Safari, and
-     adding overflow:hidden/clip/clip-path on top of that didn't fix it
-     either. Instead of trying to make it occupy zero space (something
-     Safari evidently still gives a stray pixel or two to regardless),
-     park it off in `position:fixed` real estate thousands of pixels
-     outside the viewport - wherever Safari decides to actually paint it,
-     it's nowhere anyone will ever see. -->
-<svg width="1" height="1" style="position:fixed; top:-9999px; left:-9999px; overflow:hidden;" aria-hidden="true">
-  <defs>
-    <filter id="mobileTextBlur"><feGaussianBlur stdDeviation="0.6"/></filter>
-    <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
-  </defs>
-</svg>
 
 <header class="site">
   <a class="brand" href="#/">Emmi Lacaux</a>
@@ -777,11 +755,12 @@ function route(){
   document.documentElement.style.overflow = 'hidden';
   requestAnimationFrame(()=>{ document.documentElement.style.overflow = ''; });
 
+  let noScroll = false;
   if(parts.length === 0){ renderNav(''); renderHome(); }
-  else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); }
+  else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); noScroll = true; }
   else if(parts[0] === 'work' && parts.length === 2){ renderNav('work'); renderProject(parts[1]); }
-  else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); }
-  else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); }
+  else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); noScroll = true; }
+  else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); noScroll = true; }
   else { renderNav(''); renderHome(); }
 
   // Scroll to top only after the new page's content has replaced the old -
@@ -798,6 +777,21 @@ function route(){
     window.scrollTo(0,0);
     if (++scrollLockFrames < 10) requestAnimationFrame(holdScrollTop);
   })();
+
+  // Work (index), About and Contact are all short enough to fit one
+  // screen by design - there's nothing below the fold to scroll to. Every
+  // CSS-only attempt to stop a device from still dragging the page a
+  // little anyway (overscroll-behavior, dvh, trimmed padding) helped but
+  // didn't fully close it out, so close it out directly: make the
+  // document physically unable to scroll at all on these three pages.
+  // Mobile only - on desktop a short browser window could still need to
+  // scroll a page that's normally one screen, and trapping that with no
+  // way out would be a real accessibility problem, not a fix. Deferred a
+  // frame past the holdScrollTop burst above, which needs scrolling to
+  // still work while it runs.
+  requestAnimationFrame(()=>{
+    document.documentElement.style.overflow = (noScroll && window.innerWidth <= 760) ? 'hidden' : '';
+  });
 }
 
 // The browser's own scroll auto-restoration is meant for real back/
