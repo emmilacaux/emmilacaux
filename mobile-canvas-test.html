@@ -42,6 +42,7 @@ h1{ font-size:.85rem; font-weight:400; margin:0 0 8px; }
 <div class="row"><div class="tag">N3 — 3 pasadas, radius 0.45 c/u, contrast 130%</div><div class="sample" id="n3">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">N4 — 3 pasadas, radius 0.45 c/u, contrast 145%</div><div class="sample" id="n4">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">N5 — 3 pasadas, radius 0.3 c/u, contrast 120%</div><div class="sample" id="n5">Blurry memories from the best of this summer.</div></div>
+<div class="row"><div class="tag">N3-5 — punto medio entre N3 y N5: radius 0.375 c/u, contrast 125%</div><div class="sample" id="n35">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">O1 — 3 pasadas, radius 0.35 c/u, contrast 160%</div><div class="sample" id="o1">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">O2 — 3 pasadas, radius 0.35 c/u, contrast 180%</div><div class="sample" id="o2">Blurry memories from the best of this summer.</div></div>
 <div class="row"><div class="tag">O3 — 3 pasadas, radius 0.35 c/u, contrast 200%</div><div class="sample" id="o3">Blurry memories from the best of this summer.</div></div>
@@ -194,6 +195,7 @@ document.fonts.ready.then(()=>{
   rasterize(document.getElementById('p6'), triple(0.25), 220);
   rasterize(document.getElementById('p7'), single(0.2), 200);
   rasterize(document.getElementById('p8'), single(0.25), 200);
+  rasterize(document.getElementById('n35'), triple(0.375), 125);
 });
 </script>
 </body>
