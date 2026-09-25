@@ -783,6 +783,21 @@ function route(){
   else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); noScroll = true; }
   else { renderNav(''); renderHome(); }
 
+  // Mobile Chrome can leave the previous page's title/text visibly stuck
+  // on screen right after a route change that follows a scroll - the DOM
+  // has genuinely already updated (this isn't a script bug, the new
+  // content is really there), the browser's compositor just hasn't
+  // repainted that region yet. Removing #app and immediately reinserting
+  // it (same tick, nothing async in between) forces a fresh paint instead
+  // of leaving it to chance - the same fix that worked for this same
+  // family of bug on the old per-element text overlays.
+  {
+    const app = document.getElementById('app');
+    const parent = app.parentNode;
+    parent.removeChild(app);
+    parent.appendChild(app);
+  }
+
   // Scroll to top only after the new page's content has replaced the old -
   // doing it before let the browser's scroll anchoring "helpfully" shift
   // the position again once the DOM swap landed, so a route change from a
@@ -804,7 +819,18 @@ function route(){
   // scroll a page that's normally one screen, and trapping that with no
   // way out would be a real accessibility problem, not a fix.
   requestAnimationFrame(()=>{
-    document.documentElement.style.overflow = (noScroll && window.innerWidth <= 760) ? 'hidden' : '';
+    // Loading one of these pages directly (typed URL, not in-app nav) can
+    // still have a nonzero scrollY by the time this frame runs - the
+    // scrollTo above only catches whatever scrollY was at the top of this
+    // function. Re-check right here, the instant before locking: locking
+    // overflow:hidden while scrolled down leaves no way to scroll back up
+    // at all, trapping the page below its own top.
+    if (noScroll && window.innerWidth <= 760) {
+      if (window.scrollY !== 0) window.scrollTo(0,0);
+      document.documentElement.style.overflow = 'hidden';
+    } else {
+      document.documentElement.style.overflow = '';
+    }
   });
 }
 
