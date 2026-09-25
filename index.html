@@ -457,7 +457,7 @@ const PROJECTS = [
       { type:'pause', size:'s' },
       { type:'image', scale:'sc-l', align:'left',   src:'photos/galactica-ibiza-2026/P1011929.JPG' },
       { type:'pause', size:'xl' },
-      { type:'text',  text:'Gente fuerte — thank you Galactica, you did somthing great.', align:'left' },
+      { type:'text',  text:'Gente fuerte — thank you Galactica, you did something great.', align:'left' },
     ]
   }
 ];
@@ -866,10 +866,19 @@ function rasterizeOne(el, retry){
   // which sets letter-spacing:.02em).
   const letterSpacing = cs.letterSpacing && cs.letterSpacing !== 'normal' ? cs.letterSpacing : '0px';
 
+  // Some elements (e.g. .index-head) carry their own horizontal padding
+  // rather than relying on an ancestor's — rect.width is the border box,
+  // so wrapping/drawing against it directly ignores that inset and draws
+  // the text flush with the box's outer edge instead of where it actually
+  // sits, clipping it against whatever's to the left (the logo, in that case).
+  const paddingLeft = parseFloat(cs.paddingLeft) || 0;
+  const paddingRight = parseFloat(cs.paddingRight) || 0;
+  const contentWidth = Math.max(0, width - paddingLeft - paddingRight);
+
   const measure = document.createElement('canvas').getContext('2d');
   measure.font = font;
   try { measure.letterSpacing = letterSpacing; } catch(e){}
-  const lines = wrapCanvasText(measure, text, width);
+  const lines = wrapCanvasText(measure, text, contentWidth);
   const textHeight = Math.ceil(lines.length * lineHeight);
   if (!textHeight) return;
 
@@ -887,9 +896,9 @@ function rasterizeOne(el, retry){
   ctx.textBaseline = 'top';
   lines.forEach((line, i)=>{
     const lineWidth = ctx.measureText(line).width;
-    let x = pad;
-    if (textAlign === 'center') x = pad + (width - lineWidth) / 2;
-    else if (textAlign === 'right') x = pad + width - lineWidth;
+    let x = pad + paddingLeft;
+    if (textAlign === 'center') x = pad + paddingLeft + (contentWidth - lineWidth) / 2;
+    else if (textAlign === 'right') x = pad + paddingLeft + contentWidth - lineWidth;
     ctx.fillText(line, x, i * lineHeight + pad);
   });
 
