@@ -1021,6 +1021,15 @@ function route(){
   const hash = location.hash.replace(/^#/, '') || '/';
   const parts = hash.split('/').filter(Boolean);
 
+  // Tapping a nav link while the page is still coasting from a momentum/
+  // fling scroll doesn't stop that momentum - it's driven by the browser's
+  // compositor, not JS, so a plain scrollTo(0,0) below gets overridden a
+  // moment later as the fling keeps playing out, landing the new page
+  // scrolled down instead of at the top. Briefly forcing the document
+  // non-scrollable kills any in-flight momentum outright.
+  document.documentElement.style.overflow = 'hidden';
+  requestAnimationFrame(()=>{ document.documentElement.style.overflow = ''; });
+
   if(parts.length === 0){ renderNav(''); renderHome(); }
   else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); }
   else if(parts[0] === 'work' && parts.length === 2){ renderNav('work'); renderProject(parts[1]); }
@@ -1031,13 +1040,16 @@ function route(){
   // Scroll to top only after the new page's content has replaced the old -
   // doing it before let the browser's scroll anchoring "helpfully" shift
   // the position again once the DOM swap landed, so a route change from a
-  // scrolled-down page could land anywhere but the top. Repeated on the
-  // next frame and again after the delayed rasterize pass below: a real
-  // device can still reflow after this point (late webfont swap, an image
-  // above the fold finishing its own layout) and shift the scroll position
-  // on its own even with anchoring off, so one call isn't enough to trust.
+  // scrolled-down page could land anywhere but the top. Kept up for a
+  // short burst rather than called once: the overflow:hidden above stops
+  // most in-flight momentum, but on a hard fling it can still be playing
+  // out a bit after that, and a single scrollTo can still lose to it.
   window.scrollTo(0,0);
-  requestAnimationFrame(()=>window.scrollTo(0,0));
+  let scrollLockFrames = 0;
+  (function holdScrollTop(){
+    window.scrollTo(0,0);
+    if (++scrollLockFrames < 12) requestAnimationFrame(holdScrollTop);
+  })();
 
   rasterizeMobileText();
   // A second pass shortly after: catches layout that's still settling on a
