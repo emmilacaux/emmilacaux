@@ -410,12 +410,15 @@ a:focus-visible, button:focus-visible{ outline:1.5px solid var(--red); outline-o
      the mobile media queries above. CSS `filter: blur()` proved unusable
      on real phone screens, and a data:-URI reference to this same filter
      (no element on the page at all) turned out to just silently not apply
-     on Safari - it has to be a real element in this document. Parked at
-     position:fixed, thousands of pixels outside the viewport in both
-     directions, since a merely 0-sized+hidden version of this element
-     still painted a small stray mark on real Safari; wherever it actually
-     gets painted now, it's nowhere anyone will ever see. -->
-<svg width="1" height="1" style="position:fixed; top:-9999px; left:-9999px; overflow:hidden;" aria-hidden="true">
+     on Safari - it has to be a real element in this document. Confirmed
+     (both Safari and Chrome, not interactive on long-press - a paint
+     artifact, not a real tappable element) that parking this at an
+     extreme position:fixed offset (-9999px) still left a small mark at
+     the top-left corner: some mobile browsers clamp an offset that far
+     out of bounds back toward (0,0) rather than actually placing it
+     there. Using the standard "visually hidden" pattern instead - 1x1px,
+     clipped to nothing, no extreme coordinates to clamp. -->
+<svg width="1" height="1" style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;" aria-hidden="true">
   <defs>
     <filter id="mobileTextBlur"><feGaussianBlur stdDeviation="0.6"/></filter>
     <filter id="mobileBrandBlur"><feGaussianBlur stdDeviation="0.375"/></filter>
