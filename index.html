@@ -91,6 +91,10 @@
 html{ scroll-padding-top: env(safe-area-inset-top,0px); }
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
+/* This is a full SPA re-render per route, not a page that grows content
+   above the fold gradually - scroll anchoring's "helpful" scroll-position
+   correction just fights the deliberate scroll-to-top on navigation. */
+html{ overflow-anchor:none; }
 body{
   background:var(--bg);
   color:var(--ink);
@@ -752,7 +756,14 @@ function renderNav(active){
 function route(){
   const hash = location.hash.replace(/^#/, '') || '/';
   const parts = hash.split('/').filter(Boolean);
-  window.scrollTo(0,0);
+
+  // Tapping a nav link while the page is still coasting from a momentum/
+  // fling scroll doesn't stop that momentum - it's driven by the browser's
+  // compositor, not JS, so a scrollTo(0,0) below can still lose to it a
+  // moment later as the fling keeps playing out. Briefly forcing the
+  // document non-scrollable kills any in-flight momentum outright.
+  document.documentElement.style.overflow = 'hidden';
+  requestAnimationFrame(()=>{ document.documentElement.style.overflow = ''; });
 
   if(parts.length === 0){ renderNav(''); renderHome(); }
   else if(parts[0] === 'work' && parts.length === 1){ renderNav('work'); renderWork(); }
@@ -760,6 +771,12 @@ function route(){
   else if(parts[0] === 'about'){ renderNav('about'); renderAbout(); }
   else if(parts[0] === 'contact'){ renderNav('contact'); renderContact(); }
   else { renderNav(''); renderHome(); }
+
+  // Scroll to top only after the new page's content has replaced the old -
+  // doing it before let the browser's scroll anchoring "helpfully" shift
+  // the position again once the DOM swap landed, so a route change from a
+  // scrolled-down page could land anywhere but the top.
+  window.scrollTo(0,0);
 }
 
 window.addEventListener('hashchange', route);
