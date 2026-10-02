@@ -286,6 +286,11 @@ header.site nav a{ font-size:.8rem; }
   background:#F1EFEC; /* flat neutral — "image will be here", not a simulated photo */
 }
 .photo img{ width:100%; display:block; }
+/* A scanned/exported document page (white sheet) on the site's white
+   ground has no edge of its own - a hairline in the same --line tone the
+   index rows use gives it one without adding anything new to the palette.
+   Never filtered, same as every other image here. */
+.photo.framed{ border:1px solid var(--line); background:#fff; }
 
 .photo-caption{
   margin-top:9px; font-size:.72rem; color:var(--muted);
@@ -514,6 +519,26 @@ const PROJECTS = [
       { type:'pause', size:'xl' },
       { type:'text',  text:'Gente fuerte — thank you Galactica, you did something great.', align:'left' },
     ]
+  },
+  {
+    // A written piece, shown as its PDF pages exactly as exported (images,
+    // not reflowed text), centred one after another. Lives only under Work
+    // - the home page reads PROJECTS[0] alone, so this never appears there.
+    slug: 'vittorio',
+    title: 'Vittorio',
+    year: '2026',
+    date: '',
+    location: '',
+    category: 'Writing',
+    medium: 'Writing',
+    order: 2,
+    sequence: [
+      { type:'image', scale:'sc-l', align:'center', framed:true, alt:'Vittorio — page 1 of 3', src:'writing/vittorio/page-1.png' },
+      { type:'pause', size:'s' },
+      { type:'image', scale:'sc-l', align:'center', framed:true, alt:'Vittorio — page 2 of 3', src:'writing/vittorio/page-2.png' },
+      { type:'pause', size:'s' },
+      { type:'image', scale:'sc-l', align:'center', framed:true, alt:'Vittorio — page 3 of 3', src:'writing/vittorio/page-3.png' },
+    ]
   }
 ];
 
@@ -522,7 +547,7 @@ function orderedProjects(){ return [...PROJECTS].sort((a,b)=>(a.order||0)-(b.ord
 
 function countImages(sequence){ return sequence.filter(s=>s.type==='image').length; }
 
-function photoDiv({ratio='r-3-2', scale='sc-m', align='left', caption, src, alt='', credit, number}){
+function photoDiv({ratio='r-3-2', scale='sc-m', align='left', caption, src, alt='', credit, number, framed}){
   // NOTE: there is no reveal/appear animation anywhere on the site —
   // the reveal-on-scroll system was removed. Every element, image or
   // text, is simply present in the DOM from the start.
@@ -539,7 +564,7 @@ function photoDiv({ratio='r-3-2', scale='sc-m', align='left', caption, src, alt=
 
   const p = document.createElement('div');
   if(src){
-    p.className = 'photo';
+    p.className = framed ? 'photo framed' : 'photo';
     const img = document.createElement('img');
     img.src = src;
     img.alt = alt || '';
@@ -690,9 +715,7 @@ function renderProject(slug){
   head.innerHTML = `
     <div class="title">${p.title}</div>
     <div class="meta">
-      <span>${p.category}</span>
-      <span>${p.location}</span>
-      <span>${p.date}</span>
+      ${[p.category, p.location, p.date].filter(Boolean).map(v=>`<span>${v}</span>`).join('')}
     </div>
   `;
   app.appendChild(head);
