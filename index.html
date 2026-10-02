@@ -423,6 +423,7 @@ header.site nav a{ font-size:.8rem; }
 
 /* ---------------- project head ---------------- */
 .project-head{ padding: 0 var(--gutter); margin-bottom: 14vh; }
+.project-head.compact{ margin-bottom: 7vh; }
 .project-head .title{
   font-size:1.15rem; letter-spacing:.02em; margin:0 0 14px; font-weight:500;
 }
@@ -525,7 +526,8 @@ const PROJECTS = [
     // not reflowed text), centred one after another. Lives only under Work
     // - the home page reads PROJECTS[0] alone, so this never appears there.
     slug: 'vittorio',
-    title: 'Corta experimental vida de un ser ficticio llamado Vittorio o las libertades, diversiones, influencias literaria y reflexiones de un joven escritor',
+    title: 'Corta experimental vida de un ser ficticio llamado Vittorio',
+    compactHead: true, // first page sits closer under the title than a photo project's
     year: '',
     date: '',
     location: '',
@@ -711,7 +713,7 @@ function renderProject(slug){
   }
 
   const head = document.createElement('div');
-  head.className = 'project-head';
+  head.className = p.compactHead ? 'project-head compact' : 'project-head';
   head.innerHTML = `
     <div class="title">${p.title}</div>
     <div class="meta">
